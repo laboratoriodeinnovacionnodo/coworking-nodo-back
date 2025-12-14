@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // Remove engineType = "client" if it exists, or explicitly set to "binary" or "library"
+  engineType = "client" 
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") 
+}
+
+// -----------------------------
+// ENUMS
+// -----------------------------
+enum AreaStatus {
+  LIBRE
+  OCUPADO
+  LIMPIANDO
+  FUERA_DE_SERVICIO
+  PARA_COMPARTIR
+  COMPARTIDO
+}
+
+// -----------------------------
+// MODELS
+// -----------------------------
+
+model Usuario {
+  id        Int        @id @default(autoincrement())
+  nombre    String
+  email     String     @unique
+  reservas  Reserva[]
+  createdAt DateTime   @default(now())
+}
+
+model Area {
+  id          Int         @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
+  reservas    Reserva[]
+  createdAt   DateTime    @default(now())
+}
+
+model Reserva {
+  id         Int        @id @default(autoincrement())
+  nombre     String     // Nombre del cliente que reservó
+  detalles   String?    // Datos adicionales de la reserva
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id])
+  usuarioId  Int
+  area       Area       @relation(fields: [areaId], references: [id])
+  areaId     Int
+  inicio     DateTime   @default(now())
+  fin        DateTime?  // Se completa al liberar
+  createdAt  DateTime   @default(now())
+}

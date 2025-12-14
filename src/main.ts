@@ -1,8 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+    const config = new DocumentBuilder()
+    .setTitle('Your API Title')
+    .setDescription('The API description')
+    .setVersion('1.0')
+    .addTag('api-tag') // Optional: Adds a tag to group endpoints
+    .build();
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document); // 'api' is the endpoint where docs will be served
+
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
