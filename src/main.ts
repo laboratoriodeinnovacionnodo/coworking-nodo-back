@@ -6,7 +6,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: 'https://v0.app/chat/coworking-seat-management-iPcZe687hoG',
+    origin: ['https://v0.app/chat/coworking-seat-management-iPcZe687hoG',
+      'https://v0.app/chat/coworking-seat-management-iPcZe687hoG#MvsH4roXDikWSXTOMb9HKbhoAxLiuXKu',
+      'https://v0.app/',
+    ],
+
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
