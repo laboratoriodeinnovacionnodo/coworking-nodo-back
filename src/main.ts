@@ -11,16 +11,22 @@ async function bootstrap() {
     credentials: true,
   });
 
-
-    const config = new DocumentBuilder()
+  const config = new DocumentBuilder()
     .setTitle('Your API Title')
     .setDescription('The API description')
     .setVersion('1.0')
-    .addTag('api-tag') // Optional: Adds a tag to group endpoints
+    .addTag('api-tag')
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document); // 'api' is the endpoint where docs will be served
-  await app.listen(process.env.PORT ?? 3000);
+  SwaggerModule.setup('api', app, document);
+
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+
+  console.log(`🚀 Server running on http://localhost:${port}`);
+  console.log(`📚 Swagger docs available at http://localhost:${port}/api`);
 }
+
 bootstrap();
+
