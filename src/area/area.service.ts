@@ -27,8 +27,14 @@ export class AreaService {
     });
   }
 
-  remove(id: number) {
-    return this.prisma.area.delete({ where: { id } });
+  async remove(id: number) {
+    await this.prisma.reserva.deleteMany({
+      where: { areaId: id },
+    });
+
+    return this.prisma.area.delete({
+      where: { id },
+    });
   }
 
   // Cambiar estado del área
