@@ -7,13 +7,10 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --no-frozen-lockfile
 
-# Copiamos el schema ANTES de generar el cliente
 COPY prisma ./prisma
-
-# Generamos el cliente de Prisma
+COPY prisma.config.ts ./
 RUN pnpm prisma generate
 
-# Ahora copiamos el resto del código y compilamos
 COPY . .
 RUN pnpm build
 
@@ -25,6 +22,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3550
