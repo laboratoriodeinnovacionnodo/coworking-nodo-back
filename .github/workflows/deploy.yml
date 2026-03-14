@@ -28,13 +28,6 @@ jobs:
           build-args: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
-      - name: Correr migraciones
-        run: |
-          docker run --rm \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            ghcr.io/${{ github.repository }}:latest \
-            npx prisma migrate deploy
-
       - name: Deploy en Droplet
         uses: appleboy/ssh-action@v1
         with:
@@ -47,6 +40,11 @@ jobs:
             docker pull ghcr.io/${{ github.repository }}:latest
             docker stop coworking-back || true
             docker rm coworking-back || true
+            docker run --rm \
+              --network red_interna \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              ghcr.io/${{ github.repository }}:latest \
+              npx prisma migrate deploy
             docker run -d \
               --name coworking-back \
               --restart always \
