@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,3 +25,22 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
+
+      - name: Deploy en Droplet
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          script: |
+            docker login ghcr.io -u ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker stop coworking-back || true
+            docker rm coworking-back || true
+            docker run -d \
+              --name coworking-back \
+              --restart always \
+              -p 3550:3550 \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
+              ghcr.io/${{ github.repository }}:latest
