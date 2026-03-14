@@ -9,6 +9,10 @@ RUN pnpm install --no-frozen-lockfile
 
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 RUN pnpm prisma generate
 
 COPY . .
