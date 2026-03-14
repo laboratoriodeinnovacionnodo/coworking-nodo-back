@@ -42,6 +42,7 @@ jobs:
             docker run -d \
               --name coworking-back \
               --restart always \
+              --network red_interna \
               -p 3550:3550 \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
