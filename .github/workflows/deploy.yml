@@ -27,6 +27,14 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:latest
           build-args: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+      - name: Correr migraciones
+        run: |
+          docker run --rm \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            ghcr.io/${{ github.repository }}:latest \
+            npx prisma migrate deploy
+
       - name: Deploy en Droplet
         uses: appleboy/ssh-action@v1
         with:
@@ -46,4 +54,5 @@ jobs:
               -p 3550:3550 \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
+              -e PORT="${{ secrets.PORT }}" \
               ghcr.io/${{ github.repository }}:latest
