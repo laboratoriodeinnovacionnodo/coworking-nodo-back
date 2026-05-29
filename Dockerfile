@@ -14,7 +14,6 @@ ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 
 RUN pnpm prisma generate
-
 COPY . .
 RUN pnpm build
 
