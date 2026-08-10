@@ -1,0 +1,27 @@
+{
+  "$schema": "https://repomix.com/repomix-config.schema.json",
+  "output": {
+    "filePath": "coworking-back.xml",
+    "style": "markdown",
+    "removeComments": false,
+    "showLineNumbers": true,
+    "topFilesLength": 5
+  },
+  "include": ["**/*"],
+  "ignore": {
+    "customPatterns": [
+      "dist/**",
+      "node_modules/**",
+      ".pnpm-store/**",
+      "prisma/migrations/**",
+      "prisma/generated/**",
+      "**/*.log",
+      "docker-compose.override.yml",
+      "package-lock.json",
+      "yarn.lock",
+      "pnpm-lock.yaml"
+    ],
+    "useGitignore": true,
+    "useDefaultPatterns": true
+  }
+}

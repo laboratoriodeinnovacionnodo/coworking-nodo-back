@@ -1,0 +1,1744 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where line numbers have been added.
+
+# File Summary
+
+## Purpose
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+## File Format
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A header with the file path (## File: path/to/file)
+  b. The full contents of the file in a code block
+
+## Usage Guidelines
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+## Notes
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: **/*
+- Files matching these patterns are excluded: dist/**, node_modules/**, .pnpm-store/**, prisma/migrations/**, prisma/generated/**, **/*.log, docker-compose.override.yml, package-lock.json, yarn.lock, pnpm-lock.yaml
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Line numbers have been added to the beginning of each line
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+# Directory Structure
+````
+.github/
+  workflows/
+    deploy.yml
+prisma/
+  prisma.module.ts
+  prisma.service.ts
+  schema.prisma
+src/
+  area/
+    dto/
+      create-area.dto.ts
+      update-area.dto.ts
+    entities/
+      area.entity.ts
+    area.controller.spec.ts
+    area.controller.ts
+    area.module.ts
+    area.service.spec.ts
+    area.service.ts
+  auth/
+    dto/
+      create-admin.dto.ts
+      login.dto.ts
+      update-admin.dto.ts
+    entities/
+      auth.entity.ts
+    auth.controller.spec.ts
+    auth.controller.ts
+    auth.module.ts
+    auth.service.spec.ts
+    auth.service.ts
+  reserva/
+    dto/
+      create-reserva.dto.ts
+      update-reserva.dto.ts
+    entities/
+      reserva.entity.ts
+    reserva.controller.spec.ts
+    reserva.controller.ts
+    reserva.module.ts
+    reserva.service.spec.ts
+    reserva.service.ts
+  usuario/
+    dto/
+      create-usuario.dto.ts
+      update-usuario.dto.ts
+    usuario.controller.spec.ts
+    usuario.controller.ts
+    usuario.module.ts
+    usuario.service.spec.ts
+    usuario.service.ts
+  app.controller.spec.ts
+  app.controller.ts
+  app.module.ts
+  app.service.ts
+  main.ts
+test/
+  app.e2e-spec.ts
+  jest-e2e.json
+.dockerignore
+.gitignore
+.prettierrc
+docker-compose.yml
+Dockerfile
+eslint.config.mjs
+nest-cli.json
+package.json
+prisma.config.ts
+README.md
+repomix.config.json
+tsconfig.build.json
+tsconfig.json
+````
+
+# Files
+
+## File: repomix.config.json
+````json
+ 1: {
+ 2:   "$schema": "https://repomix.com/repomix-config.schema.json",
+ 3:   "output": {
+ 4:     "filePath": "coworking-back.xml",
+ 5:     "style": "markdown",
+ 6:     "removeComments": false,
+ 7:     "showLineNumbers": true,
+ 8:     "topFilesLength": 5
+ 9:   },
+10:   "include": ["**/*"],
+11:   "ignore": {
+12:     "customPatterns": [
+13:       "dist/**",
+14:       "node_modules/**",
+15:       ".pnpm-store/**",
+16:       "prisma/migrations/**",
+17:       "prisma/generated/**",
+18:       "**/*.log",
+19:       "docker-compose.override.yml",
+20:       "package-lock.json",
+21:       "yarn.lock",
+22:       "pnpm-lock.yaml"
+23:     ],
+24:     "useGitignore": true,
+25:     "useDefaultPatterns": true
+26:   }
+27: }
+````
+
+## File: prisma/prisma.module.ts
+````typescript
+1: import { Global, Module } from '@nestjs/common';
+2: import { PrismaService } from './prisma.service';
+3: 
+4: @Global() // Hace que Prisma esté disponible en toda la app sin imports adicionales
+5: @Module({
+6:   providers: [PrismaService],
+7:   exports: [PrismaService],
+8: })
+9: export class PrismaModule {}
+````
+
+## File: prisma/prisma.service.ts
+````typescript
+ 1: import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+ 2: import { PrismaClient } from '@prisma/client';
+ 3: // Importa el adaptador de PostgreSQL
+ 4: import { PrismaPg } from '@prisma/adapter-pg';
+ 5: // Importa el driver pg (node-postgres)
+ 6: import * as pg from 'pg';
+ 7: 
+ 8: @Injectable()
+ 9: export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+10: 
+11:   constructor() {
+12:     // Asegúrate de que DATABASE_URL esté disponible en tu archivo .env
+13:     const connectionString = process.env.DATABASE_URL;
+14: 
+15:     // Crea una instancia del Pool de conexión del driver
+16:     const pool = new pg.Pool({ connectionString });
+17: 
+18:     // Crea una instancia del adaptador de Prisma
+19:     const adapter = new PrismaPg(pool);
+20: 
+21:     // Pasa el adaptador al constructor de PrismaClient
+22:     super({
+23:       adapter: adapter,
+24:       // Puedes añadir tus logs aquí si es necesario:
+25:       // log: ['query', 'error', 'warn'],
+26:     });
+27:   }
+28: 
+29:   async onModuleInit() {
+30:     await this.$connect();
+31:   }
+32: 
+33:   async onModuleDestroy() {
+34:     await this.$disconnect();
+35:   }
+36: }
+````
+
+## File: src/area/dto/create-area.dto.ts
+````typescript
+ 1: import { AreaStatus } from '@prisma/client';
+ 2: import { IsOptional, IsString, IsEnum } from 'class-validator';
+ 3: 
+ 4: export class CreateAreaDto {
+ 5:   @IsString()
+ 6:   nombre: string;
+ 7: 
+ 8:   @IsOptional()
+ 9:   @IsString()
+10:   descripcion?: string;
+11: 
+12:   @IsOptional()
+13:   @IsEnum(AreaStatus)
+14:   estado?: AreaStatus;
+15: }
+````
+
+## File: src/area/dto/update-area.dto.ts
+````typescript
+1: import { PartialType } from '@nestjs/swagger';
+2: import { CreateAreaDto } from './create-area.dto';
+3: 
+4: export class UpdateAreaDto extends PartialType(CreateAreaDto) {}
+````
+
+## File: src/area/entities/area.entity.ts
+````typescript
+1: export class Area {}
+````
+
+## File: src/area/area.controller.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { AreaController } from './area.controller';
+ 3: import { AreaService } from './area.service';
+ 4: 
+ 5: describe('AreaController', () => {
+ 6:   let controller: AreaController;
+ 7: 
+ 8:   beforeEach(async () => {
+ 9:     const module: TestingModule = await Test.createTestingModule({
+10:       controllers: [AreaController],
+11:       providers: [AreaService],
+12:     }).compile();
+13: 
+14:     controller = module.get<AreaController>(AreaController);
+15:   });
+16: 
+17:   it('should be defined', () => {
+18:     expect(controller).toBeDefined();
+19:   });
+20: });
+````
+
+## File: src/area/area.controller.ts
+````typescript
+ 1: import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+ 2: import { AreaService } from './area.service';
+ 3: import { CreateAreaDto } from './dto/create-area.dto';
+ 4: import { UpdateAreaDto } from './dto/update-area.dto';
+ 5: import { ApiTags } from '@nestjs/swagger';
+ 6: import { AreaStatus } from '@prisma/client';
+ 7: 
+ 8: @ApiTags('areas')
+ 9: @Controller('areas')
+10: export class AreaController {
+11:   constructor(private readonly areaService: AreaService) {}
+12: 
+13:   @Post()
+14:   create(@Body() dto: CreateAreaDto) {
+15:     return this.areaService.create(dto);
+16:   }
+17: 
+18:   @Get()
+19:   findAll() {
+20:     return this.areaService.findAll();
+21:   }
+22: 
+23:   @Get(':id')
+24:   findOne(@Param('id') id: string) {
+25:     return this.areaService.findOne(+id);
+26:   }
+27: 
+28:   @Patch(':id')
+29:   update(@Param('id') id: string, @Body() dto: UpdateAreaDto) {
+30:     return this.areaService.update(+id, dto);
+31:   }
+32: 
+33:   @Patch(':id/estado/:estado')
+34:   cambiarEstado(
+35:     @Param('id') id: string,
+36:     @Param('estado') estado: AreaStatus
+37:   ) {
+38:     return this.areaService.cambiarEstado(+id, estado);
+39:   }
+40: 
+41:   @Delete(':id')
+42:   remove(@Param('id') id: string) {
+43:     return this.areaService.remove(+id);
+44:   }
+45: }
+````
+
+## File: src/area/area.module.ts
+````typescript
+ 1: import { Module } from '@nestjs/common';
+ 2: import { AreaService } from './area.service';
+ 3: import { AreaController } from './area.controller';
+ 4: import { PrismaModule } from 'prisma/prisma.module';
+ 5: 
+ 6: @Module({
+ 7:   imports: [PrismaModule],
+ 8:   controllers: [AreaController],
+ 9:   providers: [AreaService],
+10: })
+11: export class AreaModule {}
+````
+
+## File: src/area/area.service.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { AreaService } from './area.service';
+ 3: 
+ 4: describe('AreaService', () => {
+ 5:   let service: AreaService;
+ 6: 
+ 7:   beforeEach(async () => {
+ 8:     const module: TestingModule = await Test.createTestingModule({
+ 9:       providers: [AreaService],
+10:     }).compile();
+11: 
+12:     service = module.get<AreaService>(AreaService);
+13:   });
+14: 
+15:   it('should be defined', () => {
+16:     expect(service).toBeDefined();
+17:   });
+18: });
+````
+
+## File: src/auth/dto/create-admin.dto.ts
+````typescript
+ 1: import { IsEmail, IsString, MinLength } from 'class-validator';
+ 2: 
+ 3: export class CreateAdminDto {
+ 4:   @IsEmail()
+ 5:   email: string;
+ 6: 
+ 7:   @IsString()
+ 8:   @MinLength(6)
+ 9:   password: string;
+10: }
+````
+
+## File: src/auth/dto/login.dto.ts
+````typescript
+ 1: import { IsEmail, IsString, MinLength } from 'class-validator';
+ 2: 
+ 3: export class LoginDto {
+ 4:   @IsEmail()
+ 5:   email: string;
+ 6: 
+ 7:   @IsString()
+ 8:   @MinLength(6)
+ 9:   password: string;
+10: }
+````
+
+## File: src/auth/dto/update-admin.dto.ts
+````typescript
+1: import { PartialType } from '@nestjs/swagger';
+2: import { CreateAdminDto } from './create-admin.dto';
+3: 
+4: export class UpdateAdminDto extends PartialType(CreateAdminDto) {}
+````
+
+## File: src/auth/entities/auth.entity.ts
+````typescript
+1: export class Auth {}
+````
+
+## File: src/auth/auth.controller.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { AuthController } from './auth.controller';
+ 3: import { AuthService } from './auth.service';
+ 4: 
+ 5: describe('AuthController', () => {
+ 6:   let controller: AuthController;
+ 7: 
+ 8:   beforeEach(async () => {
+ 9:     const module: TestingModule = await Test.createTestingModule({
+10:       controllers: [AuthController],
+11:       providers: [AuthService],
+12:     }).compile();
+13: 
+14:     controller = module.get<AuthController>(AuthController);
+15:   });
+16: 
+17:   it('should be defined', () => {
+18:     expect(controller).toBeDefined();
+19:   });
+20: });
+````
+
+## File: src/auth/auth.controller.ts
+````typescript
+ 1: import {
+ 2:   Body,
+ 3:   Controller,
+ 4:   Delete,
+ 5:   Get,
+ 6:   Param,
+ 7:   ParseIntPipe,
+ 8:   Post,
+ 9:   Put,
+10: } from '@nestjs/common';
+11: import { AuthService } from './auth.service';
+12: import { LoginDto } from './dto/login.dto';
+13: import { CreateAdminDto } from './dto/create-admin.dto';
+14: import { UpdateAdminDto } from './dto/update-admin.dto';
+15: 
+16: @Controller('auth')
+17: export class AuthController {
+18:   constructor(private readonly authService: AuthService) {}
+19: 
+20:   // 🔐 LOGIN (FRONT)
+21:   @Post('login')
+22:   login(@Body() dto: LoginDto) {
+23:     return this.authService.login(dto.email, dto.password);
+24:   }
+25: 
+26:   // ➕ CREATE ADMIN (POSTMAN)
+27:   @Post('admins')
+28:   createAdmin(@Body() dto: CreateAdminDto) {
+29:     return this.authService.createAdmin(dto);
+30:   }
+31: 
+32:   // 📄 LIST ADMINS
+33:   @Get('admins')
+34:   findAllAdmins() {
+35:     return this.authService.findAllAdmins();
+36:   }
+37: 
+38:   // 🔍 GET ADMIN
+39:   @Get('admins/:id')
+40:   findAdmin(@Param('id', ParseIntPipe) id: number) {
+41:     return this.authService.findAdminById(id);
+42:   }
+43: 
+44:   // ✏️ UPDATE ADMIN
+45:   @Put('admins/:id')
+46:   updateAdmin(
+47:     @Param('id', ParseIntPipe) id: number,
+48:     @Body() dto: UpdateAdminDto,
+49:   ) {
+50:     return this.authService.updateAdmin(id, dto);
+51:   }
+52: 
+53:   // 🗑 DELETE ADMIN
+54:   @Delete('admins/:id')
+55:   deleteAdmin(@Param('id', ParseIntPipe) id: number) {
+56:     return this.authService.deleteAdmin(id);
+57:   }
+58: }
+````
+
+## File: src/auth/auth.module.ts
+````typescript
+1: import { Module } from '@nestjs/common';
+2: import { AuthService } from './auth.service';
+3: import { AuthController } from './auth.controller';
+4: 
+5: @Module({
+6:   controllers: [AuthController],
+7:   providers: [AuthService],
+8: })
+9: export class AuthModule {}
+````
+
+## File: src/auth/auth.service.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { AuthService } from './auth.service';
+ 3: 
+ 4: describe('AuthService', () => {
+ 5:   let service: AuthService;
+ 6: 
+ 7:   beforeEach(async () => {
+ 8:     const module: TestingModule = await Test.createTestingModule({
+ 9:       providers: [AuthService],
+10:     }).compile();
+11: 
+12:     service = module.get<AuthService>(AuthService);
+13:   });
+14: 
+15:   it('should be defined', () => {
+16:     expect(service).toBeDefined();
+17:   });
+18: });
+````
+
+## File: src/auth/auth.service.ts
+````typescript
+  1: import {
+  2:   BadRequestException,
+  3:   Injectable,
+  4:   NotFoundException,
+  5:   UnauthorizedException,
+  6: } from '@nestjs/common';
+  7: import { CreateAdminDto } from './dto/create-admin.dto';
+  8: import { PrismaService } from 'prisma/prisma.service';
+  9: import { UpdateAdminDto } from './dto/update-admin.dto';
+ 10: 
+ 11: @Injectable()
+ 12: export class AuthService {
+ 13:   constructor(private prisma: PrismaService) {}
+ 14: 
+ 15:   // 🔐 LOGIN
+ 16:   async login(email: string, password: string) {
+ 17:     const admin = await this.prisma.admin.findUnique({
+ 18:       where: { email },
+ 19:     });
+ 20: 
+ 21:     if (!admin || admin.password !== password) {
+ 22:       throw new UnauthorizedException('Credenciales inválidas');
+ 23:     }
+ 24: 
+ 25:     return {
+ 26:       id: admin.id,
+ 27:       email: admin.email,
+ 28:     };
+ 29:   }
+ 30: 
+ 31:   // ➕ CREATE ADMIN
+ 32:   async createAdmin(dto: CreateAdminDto) {
+ 33:     const exists = await this.prisma.admin.findUnique({
+ 34:       where: { email: dto.email },
+ 35:     });
+ 36: 
+ 37:     if (exists) {
+ 38:       throw new BadRequestException('El email ya está registrado');
+ 39:     }
+ 40: 
+ 41:     return this.prisma.admin.create({
+ 42:       data: dto,
+ 43:       select: {
+ 44:         id: true,
+ 45:         email: true,
+ 46:         createdAt: true,
+ 47:       },
+ 48:     });
+ 49:   }
+ 50: 
+ 51:   // 📄 FIND ALL ADMINS
+ 52:   async findAllAdmins() {
+ 53:     return this.prisma.admin.findMany({
+ 54:       select: {
+ 55:         id: true,
+ 56:         email: true,
+ 57:         createdAt: true,
+ 58:       },
+ 59:     });
+ 60:   }
+ 61: 
+ 62:   // 🔍 FIND ADMIN BY ID
+ 63:   async findAdminById(id: number) {
+ 64:     const admin = await this.prisma.admin.findUnique({
+ 65:       where: { id },
+ 66:       select: {
+ 67:         id: true,
+ 68:         email: true,
+ 69:         createdAt: true,
+ 70:       },
+ 71:     });
+ 72: 
+ 73:     if (!admin) {
+ 74:       throw new NotFoundException('Admin no encontrado');
+ 75:     }
+ 76: 
+ 77:     return admin;
+ 78:   }
+ 79: 
+ 80:   // ✏️ UPDATE ADMIN
+ 81:   async updateAdmin(id: number, dto: UpdateAdminDto) {
+ 82:     await this.findAdminById(id);
+ 83: 
+ 84:     return this.prisma.admin.update({
+ 85:       where: { id },
+ 86:       data: dto,
+ 87:       select: {
+ 88:         id: true,
+ 89:         email: true,
+ 90:         createdAt: true,
+ 91:       },
+ 92:     });
+ 93:   }
+ 94: 
+ 95:   // 🗑 DELETE ADMIN
+ 96:   async deleteAdmin(id: number) {
+ 97:     await this.findAdminById(id);
+ 98: 
+ 99:     return this.prisma.admin.delete({
+100:       where: { id },
+101:       select: {
+102:         id: true,
+103:         email: true,
+104:       },
+105:     });
+106:   }
+107: }
+````
+
+## File: src/reserva/dto/create-reserva.dto.ts
+````typescript
+ 1: import { ApiProperty } from '@nestjs/swagger';
+ 2: 
+ 3: export class CreateReservaDto {
+ 4:   @ApiProperty()
+ 5:   nombre: string;
+ 6: 
+ 7:   @ApiProperty({ required: false })
+ 8:   detalles?: string;
+ 9: 
+10:   @ApiProperty()
+11:   usuarioId: number;
+12: 
+13:   @ApiProperty()
+14:   areaId: number;
+15: }
+````
+
+## File: src/reserva/dto/update-reserva.dto.ts
+````typescript
+1: import { PartialType } from '@nestjs/swagger';
+2: import { CreateReservaDto } from './create-reserva.dto';
+3: 
+4: export class UpdateReservaDto extends PartialType(CreateReservaDto) {}
+````
+
+## File: src/reserva/entities/reserva.entity.ts
+````typescript
+1: export class Reserva {}
+````
+
+## File: src/reserva/reserva.controller.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { ReservaController } from './reserva.controller';
+ 3: import { ReservaService } from './reserva.service';
+ 4: 
+ 5: describe('ReservaController', () => {
+ 6:   let controller: ReservaController;
+ 7: 
+ 8:   beforeEach(async () => {
+ 9:     const module: TestingModule = await Test.createTestingModule({
+10:       controllers: [ReservaController],
+11:       providers: [ReservaService],
+12:     }).compile();
+13: 
+14:     controller = module.get<ReservaController>(ReservaController);
+15:   });
+16: 
+17:   it('should be defined', () => {
+18:     expect(controller).toBeDefined();
+19:   });
+20: });
+````
+
+## File: src/reserva/reserva.controller.ts
+````typescript
+ 1: import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+ 2: import { ReservaService } from './reserva.service';
+ 3: import { CreateReservaDto } from './dto/create-reserva.dto';
+ 4: import { UpdateReservaDto } from './dto/update-reserva.dto';
+ 5: import { ApiTags } from '@nestjs/swagger';
+ 6: 
+ 7: @ApiTags('reservas')
+ 8: @Controller('reservas')
+ 9: export class ReservaController {
+10:   constructor(private readonly reservaService: ReservaService) {}
+11: 
+12:   @Post()
+13:   create(@Body() dto: CreateReservaDto) {
+14:     return this.reservaService.create(dto);
+15:   }
+16: 
+17:   @Get()
+18:   findAll() {
+19:     return this.reservaService.findAll();
+20:   }
+21: 
+22:   @Get(':id')
+23:   findOne(@Param('id') id: string) {
+24:     return this.reservaService.findOne(+id);
+25:   }
+26: 
+27:   @Patch(':id')
+28:   update(@Param('id') id: string, @Body() dto: UpdateReservaDto) {
+29:     return this.reservaService.update(+id, dto);
+30:   }
+31: 
+32:   @Patch(':id/completar')
+33:   completar(@Param('id') id: string) {
+34:     return this.reservaService.completarReserva(+id);
+35:   }
+36: 
+37:   @Delete(':id')
+38:   remove(@Param('id') id: string) {
+39:     return this.reservaService.remove(+id);
+40:   }
+41: }
+````
+
+## File: src/reserva/reserva.module.ts
+````typescript
+1: import { Module } from '@nestjs/common';
+2: import { ReservaService } from './reserva.service';
+3: import { ReservaController } from './reserva.controller';
+4: 
+5: @Module({
+6:   controllers: [ReservaController],
+7:   providers: [ReservaService],
+8: })
+9: export class ReservaModule {}
+````
+
+## File: src/reserva/reserva.service.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { ReservaService } from './reserva.service';
+ 3: 
+ 4: describe('ReservaService', () => {
+ 5:   let service: ReservaService;
+ 6: 
+ 7:   beforeEach(async () => {
+ 8:     const module: TestingModule = await Test.createTestingModule({
+ 9:       providers: [ReservaService],
+10:     }).compile();
+11: 
+12:     service = module.get<ReservaService>(ReservaService);
+13:   });
+14: 
+15:   it('should be defined', () => {
+16:     expect(service).toBeDefined();
+17:   });
+18: });
+````
+
+## File: src/reserva/reserva.service.ts
+````typescript
+ 1: import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+ 2: import { CreateReservaDto } from './dto/create-reserva.dto';
+ 3: import { UpdateReservaDto } from './dto/update-reserva.dto';
+ 4: import { PrismaService } from 'prisma/prisma.service';
+ 5: import { AreaStatus } from '@prisma/client';
+ 6: 
+ 7: @Injectable()
+ 8: export class ReservaService {
+ 9:   constructor(private prisma: PrismaService) {}
+10: 
+11:   async create(data: CreateReservaDto) {
+12:     const area = await this.prisma.area.findUnique({
+13:       where: { id: data.areaId },
+14:     });
+15: 
+16:     if (!area) throw new NotFoundException('Área no encontrada');
+17:     if (area.estado !== AreaStatus.LIBRE)
+18:       throw new BadRequestException('El área no está disponible');
+19: 
+20:     // Crear la reserva
+21:     const reserva = await this.prisma.reserva.create({ data });
+22: 
+23:     // Cambiar estado del área a OCUPADO
+24:     await this.prisma.area.update({
+25:       where: { id: data.areaId },
+26:       data: { estado: AreaStatus.OCUPADO },
+27:     });
+28: 
+29:     return reserva;
+30:   }
+31: 
+32:   findAll() {
+33:     return this.prisma.reserva.findMany({
+34:       include: { usuario: true, area: true },
+35:     });
+36:   }
+37: 
+38:   findOne(id: number) {
+39:     return this.prisma.reserva.findUnique({
+40:       where: { id },
+41:       include: { usuario: true, area: true },
+42:     });
+43:   }
+44: 
+45:   update(id: number, data: UpdateReservaDto) {
+46:     return this.prisma.reserva.update({
+47:       where: { id },
+48:       data,
+49:     });
+50:   }
+51: 
+52:   async completarReserva(id: number) {
+53:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
+54:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+55: 
+56:     // Finalizar reserva
+57:     const finalizada = await this.prisma.reserva.update({
+58:       where: { id },
+59:       data: { fin: new Date() },
+60:     });
+61: 
+62:     // Restaurar área a "LIBRE"
+63:     await this.prisma.area.update({
+64:       where: { id: reserva.areaId },
+65:       data: { estado: AreaStatus.LIBRE },
+66:     });
+67: 
+68:     return finalizada;
+69:   }
+70: 
+71:   remove(id: number) {
+72:     return this.prisma.reserva.delete({ where: { id } });
+73:   }
+74: }
+````
+
+## File: src/usuario/dto/create-usuario.dto.ts
+````typescript
+1: import { IsEmail, IsString, MinLength } from 'class-validator';
+2: 
+3: export class CreateUsuarioDto {
+4:   @IsString()
+5:   nombre: string;
+6: 
+7:   @IsEmail()
+8:   email: string;
+9: }
+````
+
+## File: src/usuario/dto/update-usuario.dto.ts
+````typescript
+1: import { PartialType } from '@nestjs/swagger';
+2: import { CreateUsuarioDto } from './create-usuario.dto';
+3: 
+4: export class UpdateUsuarioDto extends PartialType(CreateUsuarioDto) {
+5: }
+````
+
+## File: src/usuario/usuario.controller.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { UsuarioController } from './usuario.controller';
+ 3: 
+ 4: describe('UsuarioController', () => {
+ 5:   let controller: UsuarioController;
+ 6: 
+ 7:   beforeEach(async () => {
+ 8:     const module: TestingModule = await Test.createTestingModule({
+ 9:       controllers: [UsuarioController],
+10:     }).compile();
+11: 
+12:     controller = module.get<UsuarioController>(UsuarioController);
+13:   });
+14: 
+15:   it('should be defined', () => {
+16:     expect(controller).toBeDefined();
+17:   });
+18: });
+````
+
+## File: src/usuario/usuario.controller.ts
+````typescript
+ 1: import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
+ 2: import { UsuarioService } from './usuario.service';
+ 3: import { CreateUsuarioDto } from './dto/create-usuario.dto';
+ 4: import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+ 5: 
+ 6: @Controller('usuario')
+ 7: export class UsuarioController {
+ 8:   constructor(private readonly usuarioService: UsuarioService) {}
+ 9: 
+10:   @Post()
+11:   crear(@Body() data: CreateUsuarioDto) {
+12:     return this.usuarioService.crear(data);
+13:   }
+14: 
+15:   @Get()
+16:   listar() {
+17:     return this.usuarioService.listar();
+18:   }
+19: 
+20:   @Get(':id')
+21:   buscar(@Param('id') id: string) {
+22:     return this.usuarioService.buscarPorId(Number(id));
+23:   }
+24: 
+25:   @Patch(':id')
+26:   actualizar(@Param('id') id: string, @Body() data: UpdateUsuarioDto) {
+27:     return this.usuarioService.actualizar(Number(id), data);
+28:   }
+29: 
+30:   @Delete(':id')
+31:   eliminar(@Param('id') id: string) {
+32:     return this.usuarioService.eliminar(Number(id));
+33:   }
+34: }
+````
+
+## File: src/usuario/usuario.module.ts
+````typescript
+1: import { Module } from '@nestjs/common';
+2: import { UsuarioService } from './usuario.service';
+3: import { UsuarioController } from './usuario.controller';
+4: 
+5: @Module({
+6:   controllers: [UsuarioController],
+7:   providers: [UsuarioService],
+8: })
+9: export class UsuarioModule {}
+````
+
+## File: src/usuario/usuario.service.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { UsuarioService } from './usuario.service';
+ 3: 
+ 4: describe('UsuarioService', () => {
+ 5:   let service: UsuarioService;
+ 6: 
+ 7:   beforeEach(async () => {
+ 8:     const module: TestingModule = await Test.createTestingModule({
+ 9:       providers: [UsuarioService],
+10:     }).compile();
+11: 
+12:     service = module.get<UsuarioService>(UsuarioService);
+13:   });
+14: 
+15:   it('should be defined', () => {
+16:     expect(service).toBeDefined();
+17:   });
+18: });
+````
+
+## File: src/usuario/usuario.service.ts
+````typescript
+ 1: import { Injectable } from '@nestjs/common';
+ 2: import { CreateUsuarioDto } from './dto/create-usuario.dto';
+ 3: import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+ 4: import { PrismaService } from 'prisma/prisma.service';
+ 5: 
+ 6: @Injectable()
+ 7: export class UsuarioService {
+ 8:   constructor(private prisma: PrismaService) {}
+ 9: 
+10:   crear(data: CreateUsuarioDto) {
+11:     return this.prisma.usuario.create({
+12:       data,
+13:     });
+14:   }
+15: 
+16:   listar() {
+17:     return this.prisma.usuario.findMany({
+18:       include: { reservas: true },
+19:     });
+20:   }
+21: 
+22:   buscarPorId(id: number) {
+23:     return this.prisma.usuario.findUnique({
+24:       where: { id },
+25:       include: { reservas: true },
+26:     });
+27:   }
+28: 
+29:   actualizar(id: number, data: UpdateUsuarioDto) {
+30:     return this.prisma.usuario.update({
+31:       where: { id },
+32:       data,
+33:     });
+34:   }
+35: 
+36:   eliminar(id: number) {
+37:     return this.prisma.usuario.delete({
+38:       where: { id },
+39:     });
+40:   }
+41: }
+````
+
+## File: src/app.controller.spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { AppController } from './app.controller';
+ 3: import { AppService } from './app.service';
+ 4: 
+ 5: describe('AppController', () => {
+ 6:   let appController: AppController;
+ 7: 
+ 8:   beforeEach(async () => {
+ 9:     const app: TestingModule = await Test.createTestingModule({
+10:       controllers: [AppController],
+11:       providers: [AppService],
+12:     }).compile();
+13: 
+14:     appController = app.get<AppController>(AppController);
+15:   });
+16: 
+17:   describe('root', () => {
+18:     it('should return "Hello World!"', () => {
+19:       expect(appController.getHello()).toBe('Hello World!');
+20:     });
+21:   });
+22: });
+````
+
+## File: src/app.controller.ts
+````typescript
+ 1: import { Controller, Get } from '@nestjs/common';
+ 2: import { AppService } from './app.service';
+ 3: 
+ 4: @Controller()
+ 5: export class AppController {
+ 6:   constructor(private readonly appService: AppService) {}
+ 7: 
+ 8:   @Get()
+ 9:   getHello(): string {
+10:     return this.appService.getHello();
+11:   }
+12: }
+````
+
+## File: src/app.service.ts
+````typescript
+1: import { Injectable } from '@nestjs/common';
+2: 
+3: @Injectable()
+4: export class AppService {
+5:   getHello(): string {
+6:     return 'Hello World!';
+7:   }
+8: }
+````
+
+## File: test/app.e2e-spec.ts
+````typescript
+ 1: import { Test, TestingModule } from '@nestjs/testing';
+ 2: import { INestApplication } from '@nestjs/common';
+ 3: import * as request from 'supertest';
+ 4: import { App } from 'supertest/types';
+ 5: import { AppModule } from './../src/app.module';
+ 6: 
+ 7: describe('AppController (e2e)', () => {
+ 8:   let app: INestApplication<App>;
+ 9: 
+10:   beforeEach(async () => {
+11:     const moduleFixture: TestingModule = await Test.createTestingModule({
+12:       imports: [AppModule],
+13:     }).compile();
+14: 
+15:     app = moduleFixture.createNestApplication();
+16:     await app.init();
+17:   });
+18: 
+19:   it('/ (GET)', () => {
+20:     return request(app.getHttpServer())
+21:       .get('/')
+22:       .expect(200)
+23:       .expect('Hello World!');
+24:   });
+25: });
+````
+
+## File: test/jest-e2e.json
+````json
+1: {
+2:   "moduleFileExtensions": ["js", "json", "ts"],
+3:   "rootDir": ".",
+4:   "testEnvironment": "node",
+5:   "testRegex": ".e2e-spec.ts$",
+6:   "transform": {
+7:     "^.+\\.(t|j)s$": "ts-jest"
+8:   }
+9: }
+````
+
+## File: .dockerignore
+````
+1: node_modules
+2: dist
+3: .env
+4: .env.*
+5: coverage
+6: *.log
+7: .pnpm-store
+````
+
+## File: .prettierrc
+````
+1: {
+2:   "singleQuote": true,
+3:   "trailingComma": "all"
+4: }
+````
+
+## File: eslint.config.mjs
+````javascript
+ 1: // @ts-check
+ 2: import eslint from '@eslint/js';
+ 3: import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+ 4: import globals from 'globals';
+ 5: import tseslint from 'typescript-eslint';
+ 6: 
+ 7: export default tseslint.config(
+ 8:   {
+ 9:     ignores: ['eslint.config.mjs'],
+10:   },
+11:   eslint.configs.recommended,
+12:   ...tseslint.configs.recommendedTypeChecked,
+13:   eslintPluginPrettierRecommended,
+14:   {
+15:     languageOptions: {
+16:       globals: {
+17:         ...globals.node,
+18:         ...globals.jest,
+19:       },
+20:       sourceType: 'commonjs',
+21:       parserOptions: {
+22:         projectService: true,
+23:         tsconfigRootDir: import.meta.dirname,
+24:       },
+25:     },
+26:   },
+27:   {
+28:     rules: {
+29:       '@typescript-eslint/no-explicit-any': 'off',
+30:       '@typescript-eslint/no-floating-promises': 'warn',
+31:       '@typescript-eslint/no-unsafe-argument': 'warn'
+32:     },
+33:   },
+34: );
+````
+
+## File: nest-cli.json
+````json
+1: {
+2:   "$schema": "https://json.schemastore.org/nest-cli",
+3:   "collection": "@nestjs/schematics",
+4:   "sourceRoot": "src",
+5:   "compilerOptions": {
+6:     "deleteOutDir": true
+7:   }
+8: }
+````
+
+## File: prisma.config.ts
+````typescript
+ 1: import "dotenv/config";
+ 2: import { defineConfig, env } from "prisma/config";
+ 3: 
+ 4: export default defineConfig({
+ 5:    schema: "prisma/schema.prisma",
+ 6:    migrations: {
+ 7:      path: "prisma/migrations"
+ 8:    },
+ 9:    datasource: {
+10:       url: env("DATABASE_URL"),
+11:    },
+12: });
+````
+
+## File: README.md
+````markdown
+ 1: <p align="center">
+ 2:   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+ 3: </p>
+ 4: 
+ 5: [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+ 6: [circleci-url]: https://circleci.com/gh/nestjs/nest
+ 7: 
+ 8:   <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+ 9:     <p align="center">
+10: <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+11: <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+12: <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+13: <a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+14: <a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+15: <a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+16: <a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+17:   <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+18:     <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+19:   <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+20: </p>
+21:   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+22:   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+23: 
+24: ## Description
+25: 
+26: [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+27: 
+28: ## Project setup
+29: 
+30: ```bash
+31: $ pnpm install
+32: ```
+33: 
+34: ## Compile and run the project
+35: 
+36: ```bash
+37: # development
+38: $ pnpm run start
+39: 
+40: # watch mode
+41: $ pnpm run start:dev
+42: 
+43: # production mode
+44: $ pnpm run start:prod
+45: ```
+46: 
+47: ## Run tests
+48: 
+49: ```bash
+50: # unit tests
+51: $ pnpm run test
+52: 
+53: # e2e tests
+54: $ pnpm run test:e2e
+55: 
+56: # test coverage
+57: $ pnpm run test:cov
+58: ```
+59: 
+60: ## Deployment
+61: 
+62: When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+63: 
+64: If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+65: 
+66: ```bash
+67: $ pnpm install -g @nestjs/mau
+68: $ mau deploy
+69: ```
+70: 
+71: With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+72: 
+73: ## Resources
+74: 
+75: Check out a few resources that may come in handy when working with NestJS:
+76: 
+77: - Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+78: - For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+79: - To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+80: - Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+81: - Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+82: - Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+83: - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+84: - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+85: 
+86: ## Support
+87: 
+88: Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+89: 
+90: ## Stay in touch
+91: 
+92: - Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+93: - Website - [https://nestjs.com](https://nestjs.com/)
+94: - Twitter - [@nestframework](https://twitter.com/nestframework)
+95: 
+96: ## License
+97: 
+98: Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+````
+
+## File: tsconfig.build.json
+````json
+1: {
+2:   "extends": "./tsconfig.json",
+3:   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+4: }
+````
+
+## File: src/area/area.service.ts
+````typescript
+ 1: import { Injectable } from '@nestjs/common';
+ 2: import { CreateAreaDto } from './dto/create-area.dto';
+ 3: import { UpdateAreaDto } from './dto/update-area.dto';
+ 4: import { PrismaService } from 'prisma/prisma.service';
+ 5: import { AreaStatus } from '@prisma/client';
+ 6: 
+ 7: @Injectable()
+ 8: export class AreaService {
+ 9:   constructor(private prisma: PrismaService) {}
+10: 
+11:   create(data: CreateAreaDto) {
+12:     return this.prisma.area.create({ data });
+13:   }
+14: 
+15:   findAll() {
+16:     return this.prisma.area.findMany();
+17:   }
+18: 
+19:   findOne(id: number) {
+20:     return this.prisma.area.findUnique({ where: { id } });
+21:   }
+22: 
+23:   update(id: number, data: UpdateAreaDto) {
+24:     return this.prisma.area.update({
+25:       where: { id },
+26:       data
+27:     });
+28:   }
+29: 
+30:   async remove(id: number) {
+31:     await this.prisma.reserva.deleteMany({
+32:       where: { areaId: id },
+33:     });
+34: 
+35:     return this.prisma.area.delete({
+36:       where: { id },
+37:     });
+38:   }
+39: 
+40:   // Cambiar estado del área
+41:   cambiarEstado(id: number, estado: AreaStatus) {
+42:     return this.prisma.area.update({
+43:       where: { id },
+44:       data: { estado }
+45:     });
+46:   }
+47: }
+````
+
+## File: .gitignore
+````
+ 1: # compiled output
+ 2: /dist
+ 3: /node_modules
+ 4: /build
+ 5: 
+ 6: # Logs
+ 7: logs
+ 8: *.log
+ 9: npm-debug.log*
+10: pnpm-debug.log*
+11: yarn-debug.log*
+12: yarn-error.log*
+13: lerna-debug.log*
+14: 
+15: # OS
+16: .DS_Store
+17: 
+18: # Tests
+19: /coverage
+20: /.nyc_output
+21: 
+22: # IDEs and editors
+23: /.idea
+24: .project
+25: .classpath
+26: .c9/
+27: *.launch
+28: .settings/
+29: *.sublime-workspace
+30: 
+31: # IDE - VSCode
+32: .vscode/*
+33: !.vscode/settings.json
+34: !.vscode/tasks.json
+35: !.vscode/launch.json
+36: !.vscode/extensions.json
+37: 
+38: # dotenv environment variable files
+39: .env
+40: .env.development.local
+41: .env.test.local
+42: .env.production.local
+43: .env.local
+44: 
+45: # temp directory
+46: .temp
+47: .tmp
+48: 
+49: # Runtime data
+50: pids
+51: *.pid
+52: *.seed
+53: *.pid.lock
+54: 
+55: # Diagnostic reports (https://nodejs.org/api/report.html)
+56: report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+57: 
+58: /generated/prisma
+````
+
+## File: tsconfig.json
+````json
+ 1: {
+ 2:   "compilerOptions": {
+ 3:     "module": "nodenext",
+ 4:     "moduleResolution": "nodenext",
+ 5:     "resolvePackageJsonExports": true,
+ 6:     "esModuleInterop": true,
+ 7:     "isolatedModules": true,
+ 8:     "declaration": true,
+ 9:     "removeComments": true,
+10:     "emitDecoratorMetadata": true,
+11:     "experimentalDecorators": true,
+12:     "allowSyntheticDefaultImports": true,
+13:     "target": "ES2023",
+14:     "sourceMap": true,
+15:     "outDir": "./dist",
+16:     "baseUrl": "./",
+17:     "incremental": true,
+18:     "skipLibCheck": true,
+19:     "strictNullChecks": true,
+20:     "forceConsistentCasingInFileNames": true,
+21:     "noImplicitAny": false,
+22:     "strictBindCallApply": false,
+23:     "noFallthroughCasesInSwitch": false
+24:   },
+25:   "exclude": [
+26:     "node_modules",
+27:     "dist",
+28:     "prisma"
+29:   ]
+30: }
+````
+
+## File: src/app.module.ts
+````typescript
+ 1: import { Module } from '@nestjs/common';
+ 2: import { ConfigModule } from '@nestjs/config';
+ 3: import { AreaModule } from './area/area.module';
+ 4: import { UsuarioModule } from './usuario/usuario.module';
+ 5: import { ReservaModule } from './reserva/reserva.module';
+ 6: import { PrismaModule } from 'prisma/prisma.module';
+ 7: import { AuthModule } from './auth/auth.module';
+ 8: 
+ 9: @Module({
+10:   imports: [
+11:     ConfigModule.forRoot({
+12:       isGlobal: true,
+13:     }),
+14:     PrismaModule,
+15:     AreaModule,
+16:     UsuarioModule,
+17:     ReservaModule,
+18:     AuthModule,
+19:   ],
+20: })
+21: export class AppModule {}
+````
+
+## File: package.json
+````json
+ 1: {
+ 2:   "name": "coworking-back-nodo",
+ 3:   "version": "0.0.1",
+ 4:   "description": "",
+ 5:   "author": "",
+ 6:   "private": true,
+ 7:   "license": "UNLICENSED",
+ 8:   "scripts": {
+ 9:     "build": "nest build",
+10:     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+11:     "start": "nest start",
+12:     "start:dev": "nest start --watch",
+13:     "start:debug": "nest start --debug --watch",
+14:     "start:prod": "node dist/main",
+15:     "start:migrate": "pnpm prisma migrate deploy && pnpm start:prod",
+16:     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+17:     "test": "jest",
+18:     "test:watch": "jest --watch",
+19:     "test:cov": "jest --coverage",
+20:     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+21:     "test:e2e": "jest --config ./test/jest-e2e.json"
+22:   },
+23:   "dependencies": {
+24:     "@nestjs/common": "^11.0.1",
+25:     "@nestjs/config": "^4.0.2",
+26:     "@nestjs/core": "^11.0.1",
+27:     "@nestjs/platform-express": "^11.0.1",
+28:     "@nestjs/swagger": "^11.2.1",
+29:     "@prisma/adapter-pg": "^7.1.0",
+30:     "@prisma/client": "^7.1.0",
+31:     "class-transformer": "^0.5.1",
+32:     "class-validator": "^0.14.3",
+33:     "dotenv": "^17.2.3",
+34:     "pg": "^8.16.3",
+35:     "reflect-metadata": "^0.2.2",
+36:     "rxjs": "^7.8.1"
+37:   },
+38:   "devDependencies": {
+39:     "@eslint/eslintrc": "^3.2.0",
+40:     "@eslint/js": "^9.18.0",
+41:     "@nestjs/cli": "^11.0.0",
+42:     "@nestjs/schematics": "^11.0.0",
+43:     "@nestjs/testing": "^11.0.1",
+44:     "@types/express": "^5.0.0",
+45:     "@types/jest": "^30.0.0",
+46:     "@types/node": "^22.10.7",
+47:     "@types/supertest": "^6.0.2",
+48:     "eslint": "^9.18.0",
+49:     "eslint-config-prettier": "^10.0.1",
+50:     "eslint-plugin-prettier": "^5.2.2",
+51:     "globals": "^16.0.0",
+52:     "jest": "^30.0.0",
+53:     "prettier": "^3.4.2",
+54:     "prisma": "^7.1.0",
+55:     "source-map-support": "^0.5.21",
+56:     "supertest": "^7.0.0",
+57:     "ts-jest": "^29.2.5",
+58:     "ts-loader": "^9.5.2",
+59:     "ts-node": "^10.9.2",
+60:     "tsconfig-paths": "^4.2.0",
+61:     "typescript": "^5.7.3",
+62:     "typescript-eslint": "^8.20.0"
+63:   },
+64:   "jest": {
+65:     "moduleFileExtensions": [
+66:       "js",
+67:       "json",
+68:       "ts"
+69:     ],
+70:     "rootDir": "src",
+71:     "testRegex": ".*\\.spec\\.ts$",
+72:     "transform": {
+73:       "^.+\\.(t|j)s$": "ts-jest"
+74:     },
+75:     "collectCoverageFrom": [
+76:       "**/*.(t|j)s"
+77:     ],
+78:     "coverageDirectory": "../coverage",
+79:     "testEnvironment": "node"
+80:   }
+81: }
+````
+
+## File: prisma/schema.prisma
+````prisma
+ 1: // This is your Prisma schema file,
+ 2: // learn more about it in the docs: https://pris.ly/d/prisma-schema
+ 3: 
+ 4: // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+ 5: // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+ 6: 
+ 7: generator client {
+ 8:   provider = "prisma-client-js"
+ 9:   // Remove engineType = "client" if it exists, or explicitly set to "binary" or "library"
+10:   engineType = "client" 
+11: }
+12: 
+13: datasource db {
+14:   provider = "postgresql"
+15: }
+16: 
+17: // -----------------------------
+18: // ENUMS
+19: // -----------------------------
+20: enum AreaStatus {
+21:   LIBRE
+22:   OCUPADO
+23:   LIMPIANDO
+24:   FUERA_DE_SERVICIO
+25:   PARA_COMPARTIR
+26:   COMPARTIDO
+27: }
+28: 
+29: // -----------------------------
+30: // MODELS
+31: // -----------------------------
+32: 
+33: model Usuario {
+34:   id        Int        @id @default(autoincrement())
+35:   nombre    String
+36:   email     String     @unique
+37:   reservas  Reserva[]
+38:   createdAt DateTime   @default(now())
+39: }
+40: 
+41: model Admin {
+42:   id        Int      @id @default(autoincrement())
+43:   email     String   @unique
+44:   password  String
+45:   createdAt DateTime @default(now())
+46: }
+47: 
+48: model Area {
+49:   id          Int         @id @default(autoincrement())
+50:   nombre      String
+51:   descripcion String?
+52:   estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
+53:   reservas    Reserva[]
+54:   createdAt   DateTime    @default(now())
+55: }
+56: 
+57: model Reserva {
+58:   id         Int        @id @default(autoincrement())
+59:   nombre     String     // Nombre del cliente que reservó
+60:   detalles   String?    // Datos adicionales de la reserva
+61:   usuario    Usuario    @relation(fields: [usuarioId], references: [id])
+62:   usuarioId  Int
+63:   area       Area       @relation(fields: [areaId], references: [id])
+64:   areaId     Int
+65:   inicio     DateTime   @default(now())
+66:   fin        DateTime?  // Se completa al liberar
+67:   createdAt  DateTime   @default(now())
+68: }
+````
+
+## File: Dockerfile
+````dockerfile
+ 1: FROM node:22-alpine AS builder
+ 2: WORKDIR /app
+ 3: 
+ 4: RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
+ 5: RUN echo "node-linker=hoisted" > .npmrc
+ 6: 
+ 7: COPY package.json pnpm-lock.yaml ./
+ 8: RUN pnpm install --no-frozen-lockfile --ignore-scripts
+ 9: 
+10: COPY prisma ./prisma
+11: COPY prisma.config.ts ./
+12: 
+13: ARG DATABASE_URL
+14: ENV DATABASE_URL=$DATABASE_URL
+15: 
+16: RUN npx prisma generate
+17: 
+18: COPY . .
+19: RUN pnpm build
+20: 
+21: FROM node:22-alpine AS runner
+22: WORKDIR /app
+23: ENV NODE_ENV=production
+24: 
+25: RUN apk add --no-cache openssl
+26: 
+27: COPY --from=builder /app/node_modules ./node_modules
+28: COPY --from=builder /app/dist ./dist
+29: COPY --from=builder /app/prisma ./prisma
+30: COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+31: COPY --from=builder /app/package.json ./package.json
+32: 
+33: EXPOSE 3550
+34: 
+35: CMD ["node", "dist/src/main.js"]
+````
+
+## File: .github/workflows/deploy.yml
+````yaml
+ 1: name: CI/CD
+ 2: 
+ 3: on:
+ 4:   push:
+ 5:     branches: [main]
+ 6: 
+ 7: jobs:
+ 8:   build-and-deploy:
+ 9:     runs-on: ubuntu-latest
+10: 
+11:     steps:
+12:       - name: Checkout código
+13:         uses: actions/checkout@v4
+14: 
+15:       - name: Login a GitHub Container Registry
+16:         uses: docker/login-action@v3
+17:         with:
+18:           registry: ghcr.io
+19:           username: ${{ github.actor }}
+20:           password: ${{ secrets.GITHUB_TOKEN }}
+21: 
+22:       - name: Build y push imagen
+23:         uses: docker/build-push-action@v5
+24:         with:
+25:           context: .
+26:           push: true
+27:           tags: ghcr.io/${{ github.repository }}:latest
+28:           build-args: |
+29:             DATABASE_URL=${{ secrets.DATABASE_URL }}
+30: 
+31:       - name: Deploy en Droplet
+32:         uses: appleboy/ssh-action@v1
+33:         with:
+34:           host: ${{ secrets.DO_HOST }}
+35:           username: ${{ secrets.DO_USER }}
+36:           key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+37:           port: ${{ secrets.DO_PORT }}
+38:           script: |
+39:             docker login ghcr.io -u ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
+40:             docker pull ghcr.io/${{ github.repository }}:latest
+41:             docker stop coworking-back || true
+42:             docker rm coworking-back || true
+43:             docker run --rm \
+44:               --network red_interna \
+45:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+46:               ghcr.io/${{ github.repository }}:latest \
+47:               npx prisma migrate deploy
+48:             docker run -d \
+49:               --name coworking-back \
+50:               --restart always \
+51:               --network red_interna \
+52:               -p 3550:3550 \
+53:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+54:               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
+55:               -e PORT="${{ secrets.PORT }}" \
+56:               ghcr.io/${{ github.repository }}:latest
+````
+
+## File: src/main.ts
+````typescript
+ 1: import { NestFactory } from '@nestjs/core';
+ 2: import { AppModule } from './app.module';
+ 3: import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+ 4: 
+ 5: async function bootstrap() {
+ 6:   const app = await NestFactory.create(AppModule);
+ 7: 
+ 8:   app.enableCors({
+ 9:     origin: process.env.CORS_ORIGIN,
+10:     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+11:     credentials: true,
+12:   });
+13: 
+14:   const config = new DocumentBuilder()
+15:     .setTitle('Your API Title')
+16:     .setDescription('The API description')
+17:     .setVersion('1.0')
+18:     .addTag('api-tag')
+19:     .build();
+20: 
+21:   const document = SwaggerModule.createDocument(app, config);
+22:   SwaggerModule.setup('api', app, document);
+23: 
+24:   const port = process.env.PORT || 3550;
+25:   await app.listen(port);
+26: 
+27:   console.log(`🚀 Server running on http://localhost:${port}`);
+28:   console.log(`📚 Swagger docs available at http://localhost:${port}/api`);
+29: }
+30: 
+31: bootstrap();
+````
