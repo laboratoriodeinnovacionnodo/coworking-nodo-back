@@ -20,10 +20,6 @@ datasource db {
 enum AreaStatus {
   LIBRE
   OCUPADO
-  LIMPIANDO
-  FUERA_DE_SERVICIO
-  PARA_COMPARTIR
-  COMPARTIDO
 }
 
 // -----------------------------
@@ -52,6 +48,7 @@ model Area {
   estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
   reservas    Reserva[]
   createdAt   DateTime    @default(now())
+  areas  OcupacionArea[]
 }
 
 model Reserva {
@@ -65,4 +62,30 @@ model Reserva {
   inicio     DateTime   @default(now())
   fin        DateTime?  // Se completa al liberar
   createdAt  DateTime   @default(now())
+}
+
+model Ocupacion {
+  id               Int             @id @default(autoincrement())
+  titulo           String
+  requerimiento    String
+  cantidadPersonas Int
+  organizador      String
+  dia              String
+  hora             String
+  edadMin          Int?
+  edadMax          Int?
+  anexos           String[]
+  liberadaAt       DateTime?
+  areas            OcupacionArea[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model OcupacionArea {
+  ocupacionId Int
+  areaId      Int
+  ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
+  area        Area      @relation(fields: [areaId], references: [id])
+
+  @@id([ocupacionId, areaId])
 }

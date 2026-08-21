@@ -105,6 +105,7 @@ Dockerfile
 eslint.config.mjs
 nest-cli.json
 package.json
+pnpm-workspace.yaml
 prisma.config.ts
 README.md
 repomix.config.json
@@ -113,37 +114,6 @@ tsconfig.json
 ````
 
 # Files
-
-## File: repomix.config.json
-````json
- 1: {
- 2:   "$schema": "https://repomix.com/repomix-config.schema.json",
- 3:   "output": {
- 4:     "filePath": "coworking-back.xml",
- 5:     "style": "markdown",
- 6:     "removeComments": false,
- 7:     "showLineNumbers": true,
- 8:     "topFilesLength": 5
- 9:   },
-10:   "include": ["**/*"],
-11:   "ignore": {
-12:     "customPatterns": [
-13:       "dist/**",
-14:       "node_modules/**",
-15:       ".pnpm-store/**",
-16:       "prisma/migrations/**",
-17:       "prisma/generated/**",
-18:       "**/*.log",
-19:       "docker-compose.override.yml",
-20:       "package-lock.json",
-21:       "yarn.lock",
-22:       "pnpm-lock.yaml"
-23:     ],
-24:     "useGitignore": true,
-25:     "useDefaultPatterns": true
-26:   }
-27: }
-````
 
 ## File: prisma/prisma.module.ts
 ````typescript
@@ -1154,6 +1124,91 @@ tsconfig.json
 8: }
 ````
 
+## File: pnpm-workspace.yaml
+````yaml
+ 1: overrides:
+ 2:   hono@<4.11.4: '>=4.11.4'
+ 3:   hono@<4.11.7: '>=4.11.7'
+ 4:   diff@>=4.0.0 <4.0.4: '>=4.0.4'
+ 5:   '@isaacs/brace-expansion@<=5.0.0': '>=5.0.1'
+ 6:   webpack@>=5.49.0 <=5.104.0: '>=5.104.1'
+ 7:   webpack@>=5.49.0 <5.104.0: '>=5.104.0'
+ 8:   qs@>=6.7.0 <=6.14.1: '>=6.14.2'
+ 9:   hono@<4.11.10: '>=4.11.10'
+10:   minimatch@<3.1.3: '>=3.1.3'
+11:   minimatch@>=9.0.0 <9.0.6: '>=9.0.6'
+12:   minimatch@>=10.0.0 <10.2.1: '>=10.2.1'
+13:   minimatch@>=9.0.0 <9.0.7: '>=9.0.7'
+14:   minimatch@>=10.0.0 <10.2.3: '>=10.2.3'
+15:   minimatch@<3.1.4: '>=3.1.4'
+16:   multer@<2.1.0: '>=2.1.0'
+17:   serialize-javascript@<=7.0.2: '>=7.0.3'
+18:   ajv@<6.14.0: '>=6.14.0'
+19:   ajv@>=7.0.0-alpha.0 <8.18.0: '>=8.18.0'
+20:   qs@<6.14.1: '>=6.14.1'
+21:   multer@<2.1.1: '>=2.1.1'
+22:   hono@<4.12.4: '>=4.12.4'
+23:   '@hono/node-server@<1.19.10': '>=1.19.10'
+24:   file-type@>=13.0.0 <21.3.1: '>=21.3.1'
+25:   hono@<4.12.7: '>=4.12.7'
+26:   flatted@<3.4.0: '>=3.4.0'
+27:   file-type@>=20.0.0 <=21.3.1: '>=21.3.2'
+28:   effect@<3.20.0: '>=3.20.0'
+29:   flatted@<=3.4.1: '>=3.4.2'
+30:   handlebars@>=4.0.0 <=4.7.8: '>=4.7.9'
+31:   brace-expansion@<1.1.13: '>=1.1.13'
+32:   brace-expansion@>=2.0.0 <2.0.3: '>=2.0.3'
+33:   handlebars@>=4.0.0 <4.7.9: '>=4.7.9'
+34:   picomatch@<2.3.2: '>=2.3.2'
+35:   picomatch@>=4.0.0 <4.0.4: '>=4.0.4'
+36:   path-to-regexp@>=8.0.0 <8.4.0: '>=8.4.0'
+37:   handlebars@>=4.6.0 <=4.7.8: '>=4.7.9'
+38:   lodash@>=4.0.0 <=4.17.23: '>=4.18.0'
+39:   lodash@<=4.17.23: '>=4.18.0'
+40:   defu@<=6.1.4: '>=6.1.5'
+41:   hono@<4.12.12: '>=4.12.12'
+42:   hono@>=4.0.0 <=4.12.11: '>=4.12.12'
+43:   '@hono/node-server@<1.19.13': '>=1.19.13'
+44:   '@nestjs/core@<=11.1.17': '>=11.1.18'
+45:   hono@<4.12.18: '>=4.12.18'
+46:   hono@<4.12.16: '>=4.12.16'
+47:   serialize-javascript@>=5.0.0 <7.0.5: '>=7.0.5'
+48:   qs@>=6.11.1 <=6.15.1: '>=6.15.2'
+49:   hono@<4.12.21: '>=4.12.21'
+50:   lodash@>=4.0.0 <=4.17.22: '>=4.17.23'
+51:   form-data@>=4.0.0 <4.0.6: '>=4.0.6'
+52:   multer@>=1.0.0 <2.2.0: '>=2.2.0'
+53:   multer@>=2.0.0-alpha.1 <2.2.0: '>=2.2.0'
+54:   hono@<4.12.14: '>=4.12.14'
+55:   js-yaml@<3.15.0: '>=3.15.0'
+56:   js-yaml@>=4.0.0 <=4.1.1: '>=4.2.0'
+57:   '@babel/core@<=7.29.0': '>=7.29.6'
+58:   brace-expansion@>=2.0.0 <2.1.2: '>=2.1.2'
+59:   brace-expansion@<1.1.16: '>=1.1.16'
+60:   js-yaml@>=4.0.0 <4.3.0: '>=4.3.0'
+61:   js-yaml@>=3.0.0 <3.15.0: '>=3.15.0'
+62:   body-parser@>=2.0.0 <2.3.0: '>=2.3.0'
+63:   hono@<4.12.25: '>=4.12.25'
+64:   hono@>=4.3.3 <4.12.27: '>=4.12.27'
+65:   '@hono/node-server@<2.0.5': '>=2.0.5'
+66:   hono@>=4.0.0 <4.12.27: '>=4.12.27'
+67:   fast-uri@>=3.0.0 <=3.1.3: '>=3.1.4'
+68:   valibot@<=1.4.1: '>=1.4.2'
+69:   brace-expansion@<1.1.17: '>=1.1.17'
+70:   brace-expansion@>=2.0.0 <2.1.3: '>=2.1.3'
+71:   fast-uri@>=3.0.0 <3.1.5: '>=3.1.5'
+72:   hono@<4.12.34: '>=4.12.34'
+73:   brace-expansion@>=2.0.0 <2.1.4: '>=2.1.4'
+74:   brace-expansion@<1.1.18: '>=1.1.18'
+75:   js-yaml@>=3.0.0 <3.15.1: '>=3.15.1'
+76:   js-yaml@>=4.0.0 <4.3.1: '>=4.3.1'
+77:   fast-uri@>=3.0.0 <3.1.3: '>=3.1.3'
+78:   hono@>=3.8.0 <4.12.34: '>=4.12.34'
+79:   hono@>=4.7.0 <4.12.34: '>=4.12.34'
+80:   fast-uri@>=3.0.0 <=3.1.0: '>=3.1.1'
+81:   fast-uri@>=3.0.0 <=3.1.1: '>=3.1.2'
+````
+
 ## File: prisma.config.ts
 ````typescript
  1: import "dotenv/config";
@@ -1270,6 +1325,37 @@ tsconfig.json
 96: ## License
 97: 
 98: Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+````
+
+## File: repomix.config.json
+````json
+ 1: {
+ 2:   "$schema": "https://repomix.com/repomix-config.schema.json",
+ 3:   "output": {
+ 4:     "filePath": "coworking-back.xml",
+ 5:     "style": "markdown",
+ 6:     "removeComments": false,
+ 7:     "showLineNumbers": true,
+ 8:     "topFilesLength": 5
+ 9:   },
+10:   "include": ["**/*"],
+11:   "ignore": {
+12:     "customPatterns": [
+13:       "dist/**",
+14:       "node_modules/**",
+15:       ".pnpm-store/**",
+16:       "prisma/migrations/**",
+17:       "prisma/generated/**",
+18:       "**/*.log",
+19:       "docker-compose.override.yml",
+20:       "package-lock.json",
+21:       "yarn.lock",
+22:       "pnpm-lock.yaml"
+23:     ],
+24:     "useGitignore": true,
+25:     "useDefaultPatterns": true
+26:   }
+27: }
 ````
 
 ## File: tsconfig.build.json
@@ -1452,91 +1538,6 @@ tsconfig.json
 21: export class AppModule {}
 ````
 
-## File: package.json
-````json
- 1: {
- 2:   "name": "coworking-back-nodo",
- 3:   "version": "0.0.1",
- 4:   "description": "",
- 5:   "author": "",
- 6:   "private": true,
- 7:   "license": "UNLICENSED",
- 8:   "scripts": {
- 9:     "build": "nest build",
-10:     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-11:     "start": "nest start",
-12:     "start:dev": "nest start --watch",
-13:     "start:debug": "nest start --debug --watch",
-14:     "start:prod": "node dist/main",
-15:     "start:migrate": "pnpm prisma migrate deploy && pnpm start:prod",
-16:     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-17:     "test": "jest",
-18:     "test:watch": "jest --watch",
-19:     "test:cov": "jest --coverage",
-20:     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-21:     "test:e2e": "jest --config ./test/jest-e2e.json"
-22:   },
-23:   "dependencies": {
-24:     "@nestjs/common": "^11.0.1",
-25:     "@nestjs/config": "^4.0.2",
-26:     "@nestjs/core": "^11.0.1",
-27:     "@nestjs/platform-express": "^11.0.1",
-28:     "@nestjs/swagger": "^11.2.1",
-29:     "@prisma/adapter-pg": "^7.1.0",
-30:     "@prisma/client": "^7.1.0",
-31:     "class-transformer": "^0.5.1",
-32:     "class-validator": "^0.14.3",
-33:     "dotenv": "^17.2.3",
-34:     "pg": "^8.16.3",
-35:     "reflect-metadata": "^0.2.2",
-36:     "rxjs": "^7.8.1"
-37:   },
-38:   "devDependencies": {
-39:     "@eslint/eslintrc": "^3.2.0",
-40:     "@eslint/js": "^9.18.0",
-41:     "@nestjs/cli": "^11.0.0",
-42:     "@nestjs/schematics": "^11.0.0",
-43:     "@nestjs/testing": "^11.0.1",
-44:     "@types/express": "^5.0.0",
-45:     "@types/jest": "^30.0.0",
-46:     "@types/node": "^22.10.7",
-47:     "@types/supertest": "^6.0.2",
-48:     "eslint": "^9.18.0",
-49:     "eslint-config-prettier": "^10.0.1",
-50:     "eslint-plugin-prettier": "^5.2.2",
-51:     "globals": "^16.0.0",
-52:     "jest": "^30.0.0",
-53:     "prettier": "^3.4.2",
-54:     "prisma": "^7.1.0",
-55:     "source-map-support": "^0.5.21",
-56:     "supertest": "^7.0.0",
-57:     "ts-jest": "^29.2.5",
-58:     "ts-loader": "^9.5.2",
-59:     "ts-node": "^10.9.2",
-60:     "tsconfig-paths": "^4.2.0",
-61:     "typescript": "^5.7.3",
-62:     "typescript-eslint": "^8.20.0"
-63:   },
-64:   "jest": {
-65:     "moduleFileExtensions": [
-66:       "js",
-67:       "json",
-68:       "ts"
-69:     ],
-70:     "rootDir": "src",
-71:     "testRegex": ".*\\.spec\\.ts$",
-72:     "transform": {
-73:       "^.+\\.(t|j)s$": "ts-jest"
-74:     },
-75:     "collectCoverageFrom": [
-76:       "**/*.(t|j)s"
-77:     ],
-78:     "coverageDirectory": "../coverage",
-79:     "testEnvironment": "node"
-80:   }
-81: }
-````
-
 ## File: prisma/schema.prisma
 ````prisma
  1: // This is your Prisma schema file,
@@ -1607,6 +1608,175 @@ tsconfig.json
 66:   fin        DateTime?  // Se completa al liberar
 67:   createdAt  DateTime   @default(now())
 68: }
+````
+
+## File: package.json
+````json
+  1: {
+  2:   "name": "coworking-back-nodo",
+  3:   "version": "0.0.1",
+  4:   "description": "",
+  5:   "author": "",
+  6:   "private": true,
+  7:   "license": "UNLICENSED",
+  8:   "scripts": {
+  9:     "build": "nest build",
+ 10:     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+ 11:     "start": "nest start",
+ 12:     "start:dev": "nest start --watch",
+ 13:     "start:debug": "nest start --debug --watch",
+ 14:     "start:prod": "node dist/main",
+ 15:     "start:migrate": "pnpm prisma migrate deploy && pnpm start:prod",
+ 16:     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+ 17:     "test": "jest",
+ 18:     "test:watch": "jest --watch",
+ 19:     "test:cov": "jest --coverage",
+ 20:     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+ 21:     "test:e2e": "jest --config ./test/jest-e2e.json"
+ 22:   },
+ 23:   "dependencies": {
+ 24:     "@nestjs/common": "^11.0.1",
+ 25:     "@nestjs/config": "^4.0.2",
+ 26:     "@nestjs/core": "^11.0.1",
+ 27:     "@nestjs/platform-express": "^11.0.1",
+ 28:     "@nestjs/swagger": "^11.2.1",
+ 29:     "@prisma/adapter-pg": "^7.1.0",
+ 30:     "@prisma/client": "^7.1.0",
+ 31:     "class-transformer": "^0.5.1",
+ 32:     "class-validator": "^0.14.3",
+ 33:     "dotenv": "^17.2.3",
+ 34:     "pg": "^8.16.3",
+ 35:     "reflect-metadata": "^0.2.2",
+ 36:     "rxjs": "^7.8.1"
+ 37:   },
+ 38:   "devDependencies": {
+ 39:     "@eslint/eslintrc": "^3.2.0",
+ 40:     "@eslint/js": "^9.18.0",
+ 41:     "@nestjs/cli": "^11.0.0",
+ 42:     "@nestjs/schematics": "^11.0.0",
+ 43:     "@nestjs/testing": "^11.0.1",
+ 44:     "@types/express": "^5.0.0",
+ 45:     "@types/jest": "^30.0.0",
+ 46:     "@types/node": "^22.10.7",
+ 47:     "@types/supertest": "^6.0.2",
+ 48:     "eslint": "^9.18.0",
+ 49:     "eslint-config-prettier": "^10.0.1",
+ 50:     "eslint-plugin-prettier": "^5.2.2",
+ 51:     "globals": "^16.0.0",
+ 52:     "jest": "^30.0.0",
+ 53:     "prettier": "^3.4.2",
+ 54:     "prisma": "^7.1.0",
+ 55:     "source-map-support": "^0.5.21",
+ 56:     "supertest": "^7.0.0",
+ 57:     "ts-jest": "^29.2.5",
+ 58:     "ts-loader": "^9.5.2",
+ 59:     "ts-node": "^10.9.2",
+ 60:     "tsconfig-paths": "^4.2.0",
+ 61:     "typescript": "^5.7.3",
+ 62:     "typescript-eslint": "^8.20.0"
+ 63:   },
+ 64:   "jest": {
+ 65:     "moduleFileExtensions": [
+ 66:       "js",
+ 67:       "json",
+ 68:       "ts"
+ 69:     ],
+ 70:     "rootDir": "src",
+ 71:     "testRegex": ".*\\.spec\\.ts$",
+ 72:     "transform": {
+ 73:       "^.+\\.(t|j)s$": "ts-jest"
+ 74:     },
+ 75:     "collectCoverageFrom": [
+ 76:       "**/*.(t|j)s"
+ 77:     ],
+ 78:     "coverageDirectory": "../coverage",
+ 79:     "testEnvironment": "node"
+ 80:   },
+ 81:   "pnpm": {
+ 82:     "overrides": {
+ 83:       "hono@<4.11.4": ">=4.11.4",
+ 84:       "hono@<4.11.7": ">=4.11.7",
+ 85:       "diff@>=4.0.0 <4.0.4": ">=4.0.4",
+ 86:       "@isaacs/brace-expansion@<=5.0.0": ">=5.0.1",
+ 87:       "webpack@>=5.49.0 <=5.104.0": ">=5.104.1",
+ 88:       "webpack@>=5.49.0 <5.104.0": ">=5.104.0",
+ 89:       "qs@>=6.7.0 <=6.14.1": ">=6.14.2",
+ 90:       "hono@<4.11.10": ">=4.11.10",
+ 91:       "minimatch@<3.1.3": ">=3.1.3",
+ 92:       "minimatch@>=9.0.0 <9.0.6": ">=9.0.6",
+ 93:       "minimatch@>=10.0.0 <10.2.1": ">=10.2.1",
+ 94:       "minimatch@>=9.0.0 <9.0.7": ">=9.0.7",
+ 95:       "minimatch@>=10.0.0 <10.2.3": ">=10.2.3",
+ 96:       "minimatch@<3.1.4": ">=3.1.4",
+ 97:       "multer@<2.1.0": ">=2.1.0",
+ 98:       "serialize-javascript@<=7.0.2": ">=7.0.3",
+ 99:       "ajv@<6.14.0": ">=6.14.0",
+100:       "ajv@>=7.0.0-alpha.0 <8.18.0": ">=8.18.0",
+101:       "qs@<6.14.1": ">=6.14.1",
+102:       "multer@<2.1.1": ">=2.1.1",
+103:       "hono@<4.12.4": ">=4.12.4",
+104:       "@hono/node-server@<1.19.10": ">=1.19.10",
+105:       "file-type@>=13.0.0 <21.3.1": ">=21.3.1",
+106:       "hono@<4.12.7": ">=4.12.7",
+107:       "flatted@<3.4.0": ">=3.4.0",
+108:       "file-type@>=20.0.0 <=21.3.1": ">=21.3.2",
+109:       "effect@<3.20.0": ">=3.20.0",
+110:       "flatted@<=3.4.1": ">=3.4.2",
+111:       "handlebars@>=4.0.0 <=4.7.8": ">=4.7.9",
+112:       "brace-expansion@<1.1.13": ">=1.1.13",
+113:       "brace-expansion@>=2.0.0 <2.0.3": ">=2.0.3",
+114:       "handlebars@>=4.0.0 <4.7.9": ">=4.7.9",
+115:       "picomatch@<2.3.2": ">=2.3.2",
+116:       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4",
+117:       "path-to-regexp@>=8.0.0 <8.4.0": ">=8.4.0",
+118:       "handlebars@>=4.6.0 <=4.7.8": ">=4.7.9",
+119:       "lodash@>=4.0.0 <=4.17.23": ">=4.18.0",
+120:       "lodash@<=4.17.23": ">=4.18.0",
+121:       "defu@<=6.1.4": ">=6.1.5",
+122:       "hono@<4.12.12": ">=4.12.12",
+123:       "hono@>=4.0.0 <=4.12.11": ">=4.12.12",
+124:       "@hono/node-server@<1.19.13": ">=1.19.13",
+125:       "@nestjs/core@<=11.1.17": ">=11.1.18",
+126:       "hono@<4.12.18": ">=4.12.18",
+127:       "hono@<4.12.16": ">=4.12.16",
+128:       "serialize-javascript@>=5.0.0 <7.0.5": ">=7.0.5",
+129:       "qs@>=6.11.1 <=6.15.1": ">=6.15.2",
+130:       "hono@<4.12.21": ">=4.12.21",
+131:       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23",
+132:       "form-data@>=4.0.0 <4.0.6": ">=4.0.6",
+133:       "multer@>=1.0.0 <2.2.0": ">=2.2.0",
+134:       "multer@>=2.0.0-alpha.1 <2.2.0": ">=2.2.0",
+135:       "hono@<4.12.14": ">=4.12.14",
+136:       "js-yaml@<3.15.0": ">=3.15.0",
+137:       "js-yaml@>=4.0.0 <=4.1.1": ">=4.2.0",
+138:       "@babel/core@<=7.29.0": ">=7.29.6",
+139:       "brace-expansion@>=2.0.0 <2.1.2": ">=2.1.2",
+140:       "brace-expansion@<1.1.16": ">=1.1.16",
+141:       "js-yaml@>=4.0.0 <4.3.0": ">=4.3.0",
+142:       "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0",
+143:       "body-parser@>=2.0.0 <2.3.0": ">=2.3.0",
+144:       "hono@<4.12.25": ">=4.12.25",
+145:       "hono@>=4.3.3 <4.12.27": ">=4.12.27",
+146:       "@hono/node-server@<2.0.5": ">=2.0.5",
+147:       "hono@>=4.0.0 <4.12.27": ">=4.12.27",
+148:       "fast-uri@>=3.0.0 <=3.1.3": ">=3.1.4",
+149:       "valibot@<=1.4.1": ">=1.4.2",
+150:       "brace-expansion@<1.1.17": ">=1.1.17",
+151:       "brace-expansion@>=2.0.0 <2.1.3": ">=2.1.3",
+152:       "fast-uri@>=3.0.0 <3.1.5": ">=3.1.5",
+153:       "hono@<4.12.34": ">=4.12.34",
+154:       "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4",
+155:       "brace-expansion@<1.1.18": ">=1.1.18",
+156:       "js-yaml@>=3.0.0 <3.15.1": ">=3.15.1",
+157:       "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1",
+158:       "fast-uri@>=3.0.0 <3.1.3": ">=3.1.3",
+159:       "hono@>=3.8.0 <4.12.34": ">=4.12.34",
+160:       "hono@>=4.7.0 <4.12.34": ">=4.12.34",
+161:       "fast-uri@>=3.0.0 <=3.1.0": ">=3.1.1",
+162:       "fast-uri@>=3.0.0 <=3.1.1": ">=3.1.2"
+163:     }
+164:   }
+165: }
 ````
 
 ## File: Dockerfile
@@ -1718,27 +1888,29 @@ tsconfig.json
  6:   const app = await NestFactory.create(AppModule);
  7: 
  8:   app.enableCors({
- 9:     origin: process.env.CORS_ORIGIN,
-10:     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-11:     credentials: true,
-12:   });
-13: 
-14:   const config = new DocumentBuilder()
-15:     .setTitle('Your API Title')
-16:     .setDescription('The API description')
-17:     .setVersion('1.0')
-18:     .addTag('api-tag')
-19:     .build();
-20: 
-21:   const document = SwaggerModule.createDocument(app, config);
-22:   SwaggerModule.setup('api', app, document);
-23: 
-24:   const port = process.env.PORT || 3550;
-25:   await app.listen(port);
-26: 
-27:   console.log(`🚀 Server running on http://localhost:${port}`);
-28:   console.log(`📚 Swagger docs available at http://localhost:${port}/api`);
-29: }
-30: 
-31: bootstrap();
+ 9:     origin: process.env.CORS_ORIGIN
+10:       ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+11:       : [],
+12:     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+13:     credentials: true,
+14:   });
+15: 
+16:   const config = new DocumentBuilder()
+17:     .setTitle('Your API Title')
+18:     .setDescription('The API description')
+19:     .setVersion('1.0')
+20:     .addTag('api-tag')
+21:     .build();
+22: 
+23:   const document = SwaggerModule.createDocument(app, config);
+24:   SwaggerModule.setup('api', app, document);
+25: 
+26:   const port = process.env.PORT || 3550;
+27:   await app.listen(port);
+28: 
+29:   console.log(`🚀 Server running on http://localhost:${port}`);
+30:   console.log(`📚 Swagger docs available at http://localhost:${port}/api`);
+31: }
+32: 
+33: bootstrap();
 ````

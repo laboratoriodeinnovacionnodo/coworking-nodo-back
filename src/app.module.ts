@@ -1,3 +1,4 @@
+import { OcupacionModule } from './ocupacion/ocupacion.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AreaModule } from './area/area.module';
@@ -16,6 +17,7 @@ import { AuthModule } from './auth/auth.module';
     UsuarioModule,
     ReservaModule,
     AuthModule,
+    OcupacionModule,
   ],
 })
 export class AppModule {}
