@@ -70,8 +70,12 @@ model Ocupacion {
   requerimiento    String
   cantidadPersonas Int
   organizador      String
-  dia              String
-  hora             String
+  // ── Reemplaza dia: String + hora: String ──
+  fechaDesde       DateTime
+  fechaHasta       DateTime
+  horaDesde        String
+  horaHasta        String
+  // ─────────────────────────────────────────
   edadMin          Int?
   edadMax          Int?
   anexos           String[]

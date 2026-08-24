@@ -1,3 +1,4 @@
+import { ScheduleModule } from '@nestjs/schedule';
 import { OcupacionModule } from './ocupacion/ocupacion.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -9,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),

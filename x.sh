@@ -1,25 +1,35 @@
 #!/usr/bin/env bash
 # =============================================================================
-# back-ocupacion.sh  —  v2.0.0  —  PRODUCCIÓN
-# Módulo "ocupacion" con relación many-to-many a Area (tabla OcupacionArea)
-# Al crear  → áreas seleccionadas pasan a OCUPADO
-# Al liberar → áreas vuelven a LIBRE
-# Estados simplificados: solo LIBRE y OCUPADO
+# v5-back-ocupacion-fechas.sh — v1.0.0 — PRODUCCIÓN (coworking-back)
 #
-# ⚠️  SCHEMA MANUAL requerido ANTES de ejecutar este script.
-#     Ver bloque al final del archivo.
+# Cambios:
+#  · DTO: reemplaza dia/hora por fechaDesde/fechaHasta/horaDesde/horaHasta
+#  · Service: chequeo de conflicto de horario antes de crear
+#  · Service: scheduler cada 1 min — auto-libera áreas cuando termina el evento
+#  · Service: nuevo endpoint GET /ocupaciones/activas (para el frontend)
+#  · Controller: expone el nuevo endpoint
+#
+# ⚠️  SCHEMA YA MIGRADO MANUALMENTE antes de correr este script
 # =============================================================================
 set -euo pipefail
 
 echo ""
-echo "╔══════════════════════════════════════════════════════╗"
-echo "║   back-ocupacion.sh — v2.0.0  (many-to-many)        ║"
-echo "╚══════════════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║  v5-back-ocupacion-fechas.sh — v1.0.0                       ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
+
+if [ ! -f "package.json" ] || [ ! -d "src" ]; then
+  echo "❌  Corré desde la raíz del proyecto NestJS"
+  exit 1
+fi
 
 mkdir -p src/ocupacion/dto src/ocupacion/entities
 
-# ── 1. DTO create ─────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 1. DTO create
+# ════════════════════════════════════════════════════════════════════════════
+echo "📄  src/ocupacion/dto/create-ocupacion.dto.ts..."
 cat > src/ocupacion/dto/create-ocupacion.dto.ts << 'EOF'
 import {
   IsString,
@@ -27,6 +37,8 @@ import {
   IsInt,
   IsArray,
   IsUrl,
+  IsDateString,
+  Matches,
   Min,
   Max,
   MinLength,
@@ -37,12 +49,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateOcupacionDto {
-  @ApiProperty({ description: 'Título de la ocupación / evento' })
+  @ApiProperty({ description: 'Título del evento / ocupación' })
   @IsString()
   @MinLength(3)
   titulo: string;
 
-  @ApiProperty({ description: 'Requerimientos o descripción detallada' })
+  @ApiProperty({ description: 'Requerimientos o descripción' })
   @IsString()
   @MinLength(3)
   requerimiento: string;
@@ -53,18 +65,28 @@ export class CreateOcupacionDto {
   @Min(1)
   cantidadPersonas: number;
 
-  @ApiProperty({ description: 'Nombre del solicitante u organizador' })
+  @ApiProperty({ description: 'Nombre del organizador / solicitante' })
   @IsString()
   @MinLength(2)
   organizador: string;
 
-  @ApiProperty({ description: 'Fecha del evento (YYYY-MM-DD)' })
-  @IsString()
-  dia: string;
+  @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @IsDateString()
+  fechaDesde: string;
 
-  @ApiProperty({ description: 'Hora del evento (HH:mm)' })
+  @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
+  @IsDateString()
+  fechaHasta: string;
+
+  @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
   @IsString()
-  hora: string;
+  @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
+  horaDesde: string;
+
+  @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
+  @IsString()
+  @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
+  horaHasta: string;
 
   @ApiPropertyOptional({ description: 'Edad mínima del público' })
   @IsOptional()
@@ -89,10 +111,7 @@ export class CreateOcupacionDto {
   @ArrayMaxSize(10)
   anexos?: string[];
 
-  @ApiProperty({
-    description: 'IDs de las áreas del coworking a ocupar',
-    type: [Number],
-  })
+  @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
   @IsArray()
   @ArrayMinSize(1)
   @Type(() => Number)
@@ -100,70 +119,140 @@ export class CreateOcupacionDto {
   areaIds: number[];
 }
 EOF
-echo "✅  src/ocupacion/dto/create-ocupacion.dto.ts"
+echo "✅  create-ocupacion.dto.ts"
 
-# ── 2. DTO update ─────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 2. DTO update
+# ════════════════════════════════════════════════════════════════════════════
 cat > src/ocupacion/dto/update-ocupacion.dto.ts << 'EOF'
 import { PartialType } from '@nestjs/swagger';
 import { CreateOcupacionDto } from './create-ocupacion.dto';
-
 export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
 EOF
-echo "✅  src/ocupacion/dto/update-ocupacion.dto.ts"
+echo "✅  update-ocupacion.dto.ts"
 
-# ── 3. Entity placeholder ─────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 3. Entity placeholder
+# ════════════════════════════════════════════════════════════════════════════
 cat > src/ocupacion/entities/ocupacion.entity.ts << 'EOF'
 export class Ocupacion {}
 EOF
-echo "✅  src/ocupacion/entities/ocupacion.entity.ts"
 
-# ── 4. Service ────────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 4. Service — conflict check + auto-liberar scheduler
+# ════════════════════════════════════════════════════════════════════════════
+echo "📄  src/ocupacion/ocupacion.service.ts..."
 cat > src/ocupacion/ocupacion.service.ts << 'EOF'
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
 import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
 import { AreaStatus } from '@prisma/client';
 
+// ── Helpers de tiempo ─────────────────────────────────────────────────────────
+
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** Construye un DateTime UTC combinando fecha YYYY-MM-DD y hora HH:mm */
+function buildDatetime(fecha: string, hora: string): Date {
+  return new Date(`${fecha}T${hora}:00.000Z`);
+}
+
+/** Fecha local Argentina como YYYY-MM-DD (UTC-3) */
+function hoyArgentina(): string {
+  const ahora = new Date();
+  ahora.setHours(ahora.getHours() - 3); // UTC-3
+  return ahora.toISOString().split('T')[0];
+}
+
 @Injectable()
 export class OcupacionService {
+  private readonly logger = new Logger(OcupacionService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── CREATE ──────────────────────────────────────────────────────────────
-  async create(dto: CreateOcupacionDto) {
-    if (
-      dto.edadMin !== undefined &&
-      dto.edadMax !== undefined &&
-      dto.edadMin > dto.edadMax
-    ) {
-      throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-    }
-
-    // Verificar que todas las áreas existen y están LIBRES
-    const areas = await this.prisma.area.findMany({
-      where: { id: { in: dto.areaIds } },
+  // ── Verifica conflicto de horario para un área ────────────────────────────
+  private async verificarConflicto(
+    areaIds: number[],
+    fechaDesde: string,
+    fechaHasta: string,
+    horaDesde: string,
+    horaHasta: string,
+    excludeId?: number,
+  ): Promise<void> {
+    // Buscar ocupaciones activas (sin liberadaAt) que se superpongan en fecha
+    const ocupacionesActivas = await this.prisma.ocupacion.findMany({
+      where: {
+        liberadaAt: null,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        areas: { some: { areaId: { in: areaIds } } },
+        // Superposición de rango de fechas
+        AND: [
+          { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
+          { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
+        ],
+      },
+      include: { areas: { include: { area: true } } },
     });
 
-    if (areas.length !== dto.areaIds.length) {
-      const found = areas.map((a) => a.id);
-      const missing = dto.areaIds.filter((id) => !found.includes(id));
-      throw new NotFoundException(
-        `Área(s) no encontrada(s): ${missing.join(', ')}`,
-      );
-    }
+    // Para cada ocupación con fecha solapada, verificar superposición de horario
+    const nuevaInicio = timeToMinutes(horaDesde);
+    const nuevaFin    = timeToMinutes(horaHasta);
 
-    const ocupadas = areas.filter((a) => a.estado !== AreaStatus.LIBRE);
-    if (ocupadas.length > 0) {
+    for (const oc of ocupacionesActivas) {
+      const existInicio = timeToMinutes(oc.horaDesde);
+      const existFin    = timeToMinutes(oc.horaHasta);
+
+      // Hay solapamiento si los rangos se intersectan
+      const solapan = nuevaInicio < existFin && nuevaFin > existInicio;
+      if (!solapan) continue;
+
+      const areasConflicto = oc.areas
+        .filter((r) => areaIds.includes(r.areaId))
+        .map((r) => r.area.nombre)
+        .join(', ');
+
       throw new BadRequestException(
-        `Las siguientes áreas no están disponibles: ${ocupadas.map((a) => a.nombre).join(', ')}`,
+        `Conflicto de horario: las áreas [${areasConflicto}] ya están ocupadas ` +
+        `el ${oc.fechaDesde.toISOString().split('T')[0]} de ${oc.horaDesde} a ${oc.horaHasta} ` +
+        `(ocupación "${oc.titulo}")`,
       );
     }
+  }
 
-    // Crear ocupación + relaciones + actualizar estados en una transacción
+  // ── CREATE ────────────────────────────────────────────────────────────────
+  async create(dto: CreateOcupacionDto) {
+    // Validaciones básicas
+    if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
+      throw new BadRequestException('edadMin no puede ser mayor que edadMax');
+    }
+    if (dto.fechaDesde > dto.fechaHasta) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (dto.fechaDesde === dto.fechaHasta && dto.horaDesde >= dto.horaHasta) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+    }
+
+    // Verificar que las áreas existen
+    const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
+    if (areas.length !== dto.areaIds.length) {
+      const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
+      throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
+    }
+
+    // Verificar conflicto de horario
+    await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
+
+    // Crear ocupación + marcar áreas OCUPADO en transacción
     const ocupacion = await this.prisma.$transaction(async (tx) => {
       const nueva = await tx.ocupacion.create({
         data: {
@@ -171,21 +260,18 @@ export class OcupacionService {
           requerimiento:    dto.requerimiento,
           cantidadPersonas: dto.cantidadPersonas,
           organizador:      dto.organizador,
-          dia:              dto.dia,
-          hora:             dto.hora,
+          fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`),
+          fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`),
+          horaDesde:        dto.horaDesde,
+          horaHasta:        dto.horaHasta,
           edadMin:          dto.edadMin,
           edadMax:          dto.edadMax,
           anexos:           dto.anexos ?? [],
-          areas: {
-            create: dto.areaIds.map((areaId) => ({ areaId })),
-          },
+          areas: { create: dto.areaIds.map((areaId) => ({ areaId })) },
         },
-        include: {
-          areas: { include: { area: true } },
-        },
+        include: { areas: { include: { area: true } } },
       });
 
-      // Marcar todas las áreas como OCUPADO
       await tx.area.updateMany({
         where: { id: { in: dto.areaIds } },
         data:  { estado: AreaStatus.OCUPADO },
@@ -197,148 +283,187 @@ export class OcupacionService {
     return ocupacion;
   }
 
-  // ── FIND ALL ────────────────────────────────────────────────────────────
+  // ── FIND ALL ──────────────────────────────────────────────────────────────
   findAll() {
     return this.prisma.ocupacion.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        areas: { include: { area: true } },
-      },
+      orderBy: { fechaDesde: 'asc' },
+      include: { areas: { include: { area: true } } },
     });
   }
 
-  // ── FIND ONE ────────────────────────────────────────────────────────────
+  // ── FIND ACTIVAS (sin liberadaAt, desde hoy) ──────────────────────────────
+  findActivas() {
+    const hoy = new Date(`${hoyArgentina()}T00:00:00.000Z`);
+    return this.prisma.ocupacion.findMany({
+      where: {
+        liberadaAt: null,
+        fechaHasta: { gte: hoy },
+      },
+      orderBy: { fechaDesde: 'asc' },
+      include: { areas: { include: { area: true } } },
+    });
+  }
+
+  // ── FIND ONE ──────────────────────────────────────────────────────────────
   async findOne(id: number) {
     const ocupacion = await this.prisma.ocupacion.findUnique({
       where: { id },
-      include: {
-        areas: { include: { area: true } },
-      },
+      include: { areas: { include: { area: true } } },
     });
     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
     return ocupacion;
   }
 
-  // ── UPDATE ──────────────────────────────────────────────────────────────
+  // ── UPDATE ────────────────────────────────────────────────────────────────
   async update(id: number, dto: UpdateOcupacionDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
 
-    if (
-      dto.edadMin !== undefined &&
-      dto.edadMax !== undefined &&
-      dto.edadMin > dto.edadMax
-    ) {
+    if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Si se cambian las áreas, liberar las anteriores y ocupar las nuevas
-      if (dto.areaIds !== undefined) {
-        const actual = await tx.ocupacionArea.findMany({
-          where: { ocupacionId: id },
-          select: { areaId: true },
-        });
-        const idsActuales = actual.map((r) => r.areaId);
+    // Si cambió el horario/fecha, verificar conflictos excluyendo esta misma ocupación
+    const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
+    const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
+    const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
+    const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
+    const areaIds    = dto.areaIds    ?? actual.areas.map((r) => r.areaId);
 
-        // Validar nuevas áreas
-        const nuevasAreas = await tx.area.findMany({
-          where: { id: { in: dto.areaIds } },
-        });
-        if (nuevasAreas.length !== dto.areaIds.length) {
-          throw new NotFoundException('Una o más áreas no existen');
-        }
+    if (dto.fechaDesde || dto.fechaHasta || dto.horaDesde || dto.horaHasta || dto.areaIds) {
+      await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
+    }
 
-        // Áreas que se quitan → LIBRE; áreas que se agregan → OCUPADO
-        const aLiberar  = idsActuales.filter((i) => !dto.areaIds!.includes(i));
-        const aOcupar   = dto.areaIds.filter((i) => !idsActuales.includes(i));
-
+    // Si cambian las áreas, actualizar relaciones y estados
+    if (dto.areaIds) {
+      const anterioresIds = actual.areas.map((r) => r.areaId);
+      await this.prisma.$transaction(async (tx) => {
+        // Liberar áreas que ya no están
+        const aLiberar = anterioresIds.filter((aid) => !dto.areaIds!.includes(aid));
         if (aLiberar.length > 0) {
-          await tx.area.updateMany({
-            where: { id: { in: aLiberar } },
-            data:  { estado: AreaStatus.LIBRE },
-          });
+          await tx.area.updateMany({ where: { id: { in: aLiberar } }, data: { estado: AreaStatus.LIBRE } });
         }
-        if (aOcupar.length > 0) {
-          await tx.area.updateMany({
-            where: { id: { in: aOcupar } },
-            data:  { estado: AreaStatus.OCUPADO },
-          });
+        // Ocupar áreas nuevas
+        const aNuevas = dto.areaIds!.filter((aid) => !anterioresIds.includes(aid));
+        if (aNuevas.length > 0) {
+          await tx.area.updateMany({ where: { id: { in: aNuevas } }, data: { estado: AreaStatus.OCUPADO } });
         }
-
         // Reemplazar relaciones
         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
         await tx.ocupacionArea.createMany({
-          data: dto.areaIds.map((areaId) => ({ ocupacionId: id, areaId })),
+          data: dto.areaIds!.map((areaId) => ({ ocupacionId: id, areaId })),
         });
-      }
-
-      return tx.ocupacion.update({
-        where: { id },
-        data: {
-          ...(dto.titulo            !== undefined && { titulo:           dto.titulo }),
-          ...(dto.requerimiento     !== undefined && { requerimiento:    dto.requerimiento }),
-          ...(dto.cantidadPersonas  !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
-          ...(dto.organizador       !== undefined && { organizador:      dto.organizador }),
-          ...(dto.dia               !== undefined && { dia:              dto.dia }),
-          ...(dto.hora              !== undefined && { hora:             dto.hora }),
-          ...(dto.edadMin           !== undefined && { edadMin:          dto.edadMin }),
-          ...(dto.edadMax           !== undefined && { edadMax:          dto.edadMax }),
-          ...(dto.anexos            !== undefined && { anexos:           dto.anexos }),
-        },
-        include: {
-          areas: { include: { area: true } },
-        },
       });
+    }
+
+    return this.prisma.ocupacion.update({
+      where: { id },
+      data: {
+        ...(dto.titulo           !== undefined && { titulo:           dto.titulo }),
+        ...(dto.requerimiento    !== undefined && { requerimiento:    dto.requerimiento }),
+        ...(dto.cantidadPersonas !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
+        ...(dto.organizador      !== undefined && { organizador:      dto.organizador }),
+        ...(dto.fechaDesde       !== undefined && { fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`) }),
+        ...(dto.fechaHasta       !== undefined && { fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`) }),
+        ...(dto.horaDesde        !== undefined && { horaDesde:        dto.horaDesde }),
+        ...(dto.horaHasta        !== undefined && { horaHasta:        dto.horaHasta }),
+        ...(dto.edadMin          !== undefined && { edadMin:          dto.edadMin }),
+        ...(dto.edadMax          !== undefined && { edadMax:          dto.edadMax }),
+        ...(dto.anexos           !== undefined && { anexos:           dto.anexos }),
+      },
+      include: { areas: { include: { area: true } } },
     });
   }
 
-  // ── LIBERAR (completar ocupación) ───────────────────────────────────────
+  // ── LIBERAR MANUAL ────────────────────────────────────────────────────────
   async liberar(id: number) {
     const ocupacion = await this.findOne(id);
-
-    const areaIds = ocupacion.areas.map((r) => r.areaId);
+    const areaIds   = ocupacion.areas.map((r) => r.areaId);
 
     await this.prisma.$transaction(async (tx) => {
       if (areaIds.length > 0) {
-        await tx.area.updateMany({
-          where: { id: { in: areaIds } },
-          data:  { estado: AreaStatus.LIBRE },
-        });
+        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
       }
-      await tx.ocupacion.update({
-        where: { id },
-        data:  { liberadaAt: new Date() },
-      });
+      await tx.ocupacion.update({ where: { id }, data: { liberadaAt: new Date() } });
     });
 
     return this.findOne(id);
   }
 
-  // ── REMOVE ──────────────────────────────────────────────────────────────
+  // ── REMOVE ────────────────────────────────────────────────────────────────
   async remove(id: number) {
     const ocupacion = await this.findOne(id);
     const areaIds   = ocupacion.areas.map((r) => r.areaId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-
       if (areaIds.length > 0) {
-        await tx.area.updateMany({
-          where: { id: { in: areaIds } },
-          data:  { estado: AreaStatus.LIBRE },
-        });
+        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
       }
-
       await tx.ocupacion.delete({ where: { id } });
     });
 
     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
   }
+
+  // ── CRON: auto-liberar áreas cuando termina el evento ────────────────────
+  // Corre cada minuto. Libera ocupaciones donde fechaHasta+horaHasta < ahora
+  @Cron('* * * * *')
+  async autoLiberarVencidas() {
+    const ahora      = new Date();
+    const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000); // UTC-3
+    const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
+    const minutosNow = ahoraUTC3.getHours() * 60 + ahoraUTC3.getMinutes();
+
+    try {
+      // Buscar ocupaciones activas cuya fechaHasta ya pasó o es hoy y horaHasta ya pasó
+      const candidatas = await this.prisma.ocupacion.findMany({
+        where: {
+          liberadaAt: null,
+          fechaHasta: { lte: new Date(`${fechaHoy}T23:59:59.000Z`) },
+        },
+        include: { areas: { include: { area: true } } },
+      });
+
+      for (const oc of candidatas) {
+        const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
+
+        // Si la fecha de fin ya pasó completamente
+        if (fechaFin < fechaHoy) {
+          await this.liberarInterno(oc);
+          continue;
+        }
+
+        // Si es hoy, verificar que la hora ya pasó
+        if (fechaFin === fechaHoy) {
+          const minutosFin = timeToMinutes(oc.horaHasta);
+          if (minutosNow >= minutosFin) {
+            await this.liberarInterno(oc);
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.error('Error en autoLiberarVencidas:', (err as Error).message);
+    }
+  }
+
+  private async liberarInterno(oc: { id: number; areas: { areaId: number }[] }) {
+    const areaIds = oc.areas.map((r) => r.areaId);
+    await this.prisma.$transaction(async (tx) => {
+      if (areaIds.length > 0) {
+        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+      }
+      await tx.ocupacion.update({ where: { id: oc.id }, data: { liberadaAt: new Date() } });
+    });
+    this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
+  }
 }
 EOF
-echo "✅  src/ocupacion/ocupacion.service.ts"
+echo "✅  ocupacion.service.ts"
 
-# ── 5. Controller ─────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 5. Controller — agrega GET /activas
+# ════════════════════════════════════════════════════════════════════════════
+echo "📄  src/ocupacion/ocupacion.controller.ts..."
 cat > src/ocupacion/ocupacion.controller.ts << 'EOF'
 import {
   Controller,
@@ -367,18 +492,24 @@ export class OcupacionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Crear ocupación y marcar áreas como OCUPADO' })
+  @ApiOperation({ summary: 'Crear ocupación — valida conflictos de horario y marca áreas OCUPADO' })
   @ApiResponse({ status: 201, description: 'Ocupación creada' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o áreas no disponibles' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o conflicto de horario' })
   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
   create(@Body() dto: CreateOcupacionDto) {
     return this.ocupacionService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas las ocupaciones con sus áreas' })
+  @ApiOperation({ summary: 'Listar todas las ocupaciones' })
   findAll() {
     return this.ocupacionService.findAll();
+  }
+
+  @Get('activas')
+  @ApiOperation({ summary: 'Listar ocupaciones activas (sin liberadaAt, desde hoy)' })
+  findActivas() {
+    return this.ocupacionService.findActivas();
   }
 
   @Get(':id')
@@ -389,16 +520,13 @@ export class OcupacionController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar ocupación (también actualiza áreas si se envía areaIds)' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateOcupacionDto,
-  ) {
+  @ApiOperation({ summary: 'Actualizar ocupación — revalida conflictos si cambia horario/áreas' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOcupacionDto) {
     return this.ocupacionService.update(id, dto);
   }
 
   @Patch(':id/liberar')
-  @ApiOperation({ summary: 'Liberar ocupación → áreas vuelven a LIBRE' })
+  @ApiOperation({ summary: 'Liberar ocupación manualmente → áreas vuelven a LIBRE' })
   liberar(@Param('id', ParseIntPipe) id: number) {
     return this.ocupacionService.liberar(id);
   }
@@ -411,117 +539,65 @@ export class OcupacionController {
   }
 }
 EOF
-echo "✅  src/ocupacion/ocupacion.controller.ts"
+echo "✅  ocupacion.controller.ts"
 
-# ── 6. Module ─────────────────────────────────────────────────────────────────
-cat > src/ocupacion/ocupacion.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { OcupacionService } from './ocupacion.service';
-import { OcupacionController } from './ocupacion.controller';
-
-@Module({
-  controllers: [OcupacionController],
-  providers:   [OcupacionService],
-  exports:     [OcupacionService],
-})
-export class OcupacionModule {}
-EOF
-echo "✅  src/ocupacion/ocupacion.module.ts"
-
-# ── 7. Registrar en AppModule ─────────────────────────────────────────────────
-if grep -q "OcupacionModule" src/app.module.ts; then
-  echo "ℹ️   OcupacionModule ya estaba registrado"
-else
-  sed -i "1s/^/import { OcupacionModule } from '.\/ocupacion\/ocupacion.module';\n/" src/app.module.ts
-  sed -i "s/AuthModule,/AuthModule,\n    OcupacionModule,/" src/app.module.ts
-  echo "✅  OcupacionModule registrado en app.module.ts"
-fi
-
-# ── 8. ValidationPipe global en main.ts ──────────────────────────────────────
-if grep -q "useGlobalPipes" src/main.ts; then
-  echo "ℹ️   ValidationPipe global ya presente"
-else
-  sed -i "s/app\.enableCors/app.useGlobalPipes(new (require('@nestjs\/common').ValidationPipe)({ transform: true, whitelist: true }));\n\n  app.enableCors/" src/main.ts
-  echo "✅  ValidationPipe global añadido"
-fi
-
-# ── 9. Dependencias ───────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 6. Module — asegurar que ScheduleModule esté en AppModule
+# ════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "📦  Verificando class-validator / class-transformer..."
-if ! grep -q '"class-validator"' package.json; then
-  pnpm add class-validator class-transformer
-  echo "✅  Dependencias instaladas"
-else
-  echo "ℹ️   class-validator ya presente"
+echo "📄  Verificando ScheduleModule en app.module.ts..."
+if ! grep -q "ScheduleModule" src/app.module.ts; then
+  node - << 'JSEOF'
+const fs  = require('fs')
+const path = 'src/app.module.ts'
+let src    = fs.readFileSync(path, 'utf8')
+
+// Agregar import de ScheduleModule
+if (!src.includes('@nestjs/schedule')) {
+  src = `import { ScheduleModule } from '@nestjs/schedule';\n` + src
+}
+
+// Agregar ScheduleModule.forRoot() en imports
+src = src.replace(
+  /imports:\s*\[/,
+  `imports: [\n    ScheduleModule.forRoot(),`
+)
+
+fs.writeFileSync(path, src, 'utf8')
+console.log('✅  ScheduleModule agregado a app.module.ts')
+JSEOF
 fi
 
-# ── 10. Build ─────────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# 7. Instalar @nestjs/schedule si no está
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "📦  Verificando @nestjs/schedule..."
+if ! grep -q '"@nestjs/schedule"' package.json; then
+  pnpm add @nestjs/schedule
+  echo "✅  @nestjs/schedule instalado"
+else
+  echo "ℹ️   @nestjs/schedule ya presente"
+fi
+
+# ════════════════════════════════════════════════════════════════════════════
+# 8. Build
+# ════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "🔨  Compilando..."
 pnpm build
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║  ✅  back-ocupacion.sh v2 completado                            ║"
+echo "║  ✅  v5-back-ocupacion-fechas.sh — v1.0.0 completado            ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
-echo "  Endpoints disponibles:"
-echo "    POST   /ocupaciones           → crea y ocupa áreas"
-echo "    GET    /ocupaciones           → lista con áreas incluidas"
-echo "    GET    /ocupaciones/:id"
-echo "    PATCH  /ocupaciones/:id       → actualiza (incluso áreas)"
-echo "    PATCH  /ocupaciones/:id/liberar → libera áreas → LIBRE"
-echo "    DELETE /ocupaciones/:id       → elimina y libera áreas"
+echo "  Nuevos endpoints:"
+echo "    POST  /ocupaciones        → crea, valida conflicto de horario"
+echo "    GET   /ocupaciones/activas → solo activas desde hoy"
+echo "    PATCH /ocupaciones/:id/liberar"
 echo ""
-echo "════════════════════════════════════════════════════════════════════"
-echo "  ⚠️  SCHEMA MANUAL — Agregar a prisma/schema.prisma:"
-echo "════════════════════════════════════════════════════════════════════"
-cat << 'SCHEMA'
-
-// ── Simplificar AreaStatus a solo dos estados ──────────────────────────────
-// REEMPLAZÁ el enum existente por este:
-enum AreaStatus {
-  LIBRE
-  OCUPADO
-}
-
-// ── Nuevo modelo Ocupacion ─────────────────────────────────────────────────
-model Ocupacion {
-  id               Int             @id @default(autoincrement())
-  titulo           String
-  requerimiento    String
-  cantidadPersonas Int
-  organizador      String
-  dia              String
-  hora             String
-  edadMin          Int?
-  edadMax          Int?
-  anexos           String[]
-  liberadaAt       DateTime?
-  areas            OcupacionArea[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-}
-
-// ── Tabla intermedia many-to-many ──────────────────────────────────────────
-model OcupacionArea {
-  ocupacionId Int
-  areaId      Int
-  ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
-  area        Area      @relation(fields: [areaId], references: [id])
-
-  @@id([ocupacionId, areaId])
-}
-
-// ── En el modelo Area existente, agregar la relación inversa: ──────────────
-// areas  OcupacionArea[]    ← agregar esta línea dentro del model Area
-
-SCHEMA
+echo "  Cron cada 1 min → auto-libera áreas al terminar el evento"
 echo ""
-echo "  ⚠️  El enum AreaStatus cambia — revisá que los datos existentes"
-echo "     solo tengan LIBRE u OCUPADO antes de migrar."
-echo ""
-echo "  Luego ejecutá:"
-echo "    npx prisma migrate dev --name add_ocupacion_many_to_many"
-echo "    npx prisma generate"
+echo "  ⚠️  Verificá que en app.module.ts esté ScheduleModule.forRoot()"
 echo ""

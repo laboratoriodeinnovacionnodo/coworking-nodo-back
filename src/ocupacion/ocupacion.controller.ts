@@ -25,18 +25,24 @@ export class OcupacionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Crear ocupación y marcar áreas como OCUPADO' })
+  @ApiOperation({ summary: 'Crear ocupación — valida conflictos de horario y marca áreas OCUPADO' })
   @ApiResponse({ status: 201, description: 'Ocupación creada' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o áreas no disponibles' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o conflicto de horario' })
   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
   create(@Body() dto: CreateOcupacionDto) {
     return this.ocupacionService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas las ocupaciones con sus áreas' })
+  @ApiOperation({ summary: 'Listar todas las ocupaciones' })
   findAll() {
     return this.ocupacionService.findAll();
+  }
+
+  @Get('activas')
+  @ApiOperation({ summary: 'Listar ocupaciones activas (sin liberadaAt, desde hoy)' })
+  findActivas() {
+    return this.ocupacionService.findActivas();
   }
 
   @Get(':id')
@@ -47,16 +53,13 @@ export class OcupacionController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar ocupación (también actualiza áreas si se envía areaIds)' })
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateOcupacionDto,
-  ) {
+  @ApiOperation({ summary: 'Actualizar ocupación — revalida conflictos si cambia horario/áreas' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOcupacionDto) {
     return this.ocupacionService.update(id, dto);
   }
 
   @Patch(':id/liberar')
-  @ApiOperation({ summary: 'Liberar ocupación → áreas vuelven a LIBRE' })
+  @ApiOperation({ summary: 'Liberar ocupación manualmente → áreas vuelven a LIBRE' })
   liberar(@Param('id', ParseIntPipe) id: number) {
     return this.ocupacionService.liberar(id);
   }
