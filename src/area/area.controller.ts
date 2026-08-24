@@ -20,6 +20,12 @@ export class AreaController {
     return this.areaService.findAll();
   }
 
+  // Bulk: PATCH /areas/bloquear-todas/OCUPADO | LIBRE
+  @Patch('bloquear-todas/:estado')
+  bloquearTodas(@Param('estado') estado: AreaStatus) {
+    return this.areaService.bloquearTodas(estado);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.areaService.findOne(+id);

@@ -594,173 +594,9 @@ x.sh
 107: }
 ````
 
-## File: src/ocupacion/dto/create-ocupacion.dto.ts
-````typescript
- 1: import {
- 2:   IsString,
- 3:   IsOptional,
- 4:   IsInt,
- 5:   IsArray,
- 6:   IsUrl,
- 7:   Min,
- 8:   Max,
- 9:   MinLength,
-10:   ArrayMinSize,
-11:   ArrayMaxSize,
-12: } from 'class-validator';
-13: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-14: import { Type } from 'class-transformer';
-15: 
-16: export class CreateOcupacionDto {
-17:   @ApiProperty({ description: 'Título de la ocupación / evento' })
-18:   @IsString()
-19:   @MinLength(3)
-20:   titulo: string;
-21: 
-22:   @ApiProperty({ description: 'Requerimientos o descripción detallada' })
-23:   @IsString()
-24:   @MinLength(3)
-25:   requerimiento: string;
-26: 
-27:   @ApiProperty({ description: 'Cantidad estimada de personas' })
-28:   @Type(() => Number)
-29:   @IsInt()
-30:   @Min(1)
-31:   cantidadPersonas: number;
-32: 
-33:   @ApiProperty({ description: 'Nombre del solicitante u organizador' })
-34:   @IsString()
-35:   @MinLength(2)
-36:   organizador: string;
-37: 
-38:   @ApiProperty({ description: 'Fecha del evento (YYYY-MM-DD)' })
-39:   @IsString()
-40:   dia: string;
-41: 
-42:   @ApiProperty({ description: 'Hora del evento (HH:mm)' })
-43:   @IsString()
-44:   hora: string;
-45: 
-46:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
-47:   @IsOptional()
-48:   @Type(() => Number)
-49:   @IsInt()
-50:   @Min(0)
-51:   @Max(120)
-52:   edadMin?: number;
-53: 
-54:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
-55:   @IsOptional()
-56:   @Type(() => Number)
-57:   @IsInt()
-58:   @Min(0)
-59:   @Max(120)
-60:   edadMax?: number;
-61: 
-62:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
-63:   @IsOptional()
-64:   @IsArray()
-65:   @IsUrl({}, { each: true })
-66:   @ArrayMaxSize(10)
-67:   anexos?: string[];
-68: 
-69:   @ApiProperty({
-70:     description: 'IDs de las áreas del coworking a ocupar',
-71:     type: [Number],
-72:   })
-73:   @IsArray()
-74:   @ArrayMinSize(1)
-75:   @Type(() => Number)
-76:   @IsInt({ each: true })
-77:   areaIds: number[];
-78: }
-````
-
-## File: src/ocupacion/dto/update-ocupacion.dto.ts
-````typescript
-1: import { PartialType } from '@nestjs/swagger';
-2: import { CreateOcupacionDto } from './create-ocupacion.dto';
-3: 
-4: export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
-````
-
 ## File: src/ocupacion/entities/ocupacion.entity.ts
 ````typescript
 1: export class Ocupacion {}
-````
-
-## File: src/ocupacion/ocupacion.controller.ts
-````typescript
- 1: import {
- 2:   Controller,
- 3:   Get,
- 4:   Post,
- 5:   Patch,
- 6:   Delete,
- 7:   Param,
- 8:   Body,
- 9:   ParseIntPipe,
-10:   HttpCode,
-11:   HttpStatus,
-12:   UsePipes,
-13:   ValidationPipe,
-14: } from '@nestjs/common';
-15: import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-16: import { OcupacionService } from './ocupacion.service';
-17: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-18: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-19: 
-20: @ApiTags('ocupaciones')
-21: @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-22: @Controller('ocupaciones')
-23: export class OcupacionController {
-24:   constructor(private readonly ocupacionService: OcupacionService) {}
-25: 
-26:   @Post()
-27:   @HttpCode(HttpStatus.CREATED)
-28:   @ApiOperation({ summary: 'Crear ocupación y marcar áreas como OCUPADO' })
-29:   @ApiResponse({ status: 201, description: 'Ocupación creada' })
-30:   @ApiResponse({ status: 400, description: 'Datos inválidos o áreas no disponibles' })
-31:   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
-32:   create(@Body() dto: CreateOcupacionDto) {
-33:     return this.ocupacionService.create(dto);
-34:   }
-35: 
-36:   @Get()
-37:   @ApiOperation({ summary: 'Listar todas las ocupaciones con sus áreas' })
-38:   findAll() {
-39:     return this.ocupacionService.findAll();
-40:   }
-41: 
-42:   @Get(':id')
-43:   @ApiOperation({ summary: 'Obtener una ocupación por ID' })
-44:   @ApiResponse({ status: 404, description: 'No encontrada' })
-45:   findOne(@Param('id', ParseIntPipe) id: number) {
-46:     return this.ocupacionService.findOne(id);
-47:   }
-48: 
-49:   @Patch(':id')
-50:   @ApiOperation({ summary: 'Actualizar ocupación (también actualiza áreas si se envía areaIds)' })
-51:   update(
-52:     @Param('id', ParseIntPipe) id: number,
-53:     @Body() dto: UpdateOcupacionDto,
-54:   ) {
-55:     return this.ocupacionService.update(id, dto);
-56:   }
-57: 
-58:   @Patch(':id/liberar')
-59:   @ApiOperation({ summary: 'Liberar ocupación → áreas vuelven a LIBRE' })
-60:   liberar(@Param('id', ParseIntPipe) id: number) {
-61:     return this.ocupacionService.liberar(id);
-62:   }
-63: 
-64:   @Delete(':id')
-65:   @HttpCode(HttpStatus.NO_CONTENT)
-66:   @ApiOperation({ summary: 'Eliminar ocupación y liberar sus áreas' })
-67:   remove(@Param('id', ParseIntPipe) id: number) {
-68:     return this.ocupacionService.remove(id);
-69:   }
-70: }
 ````
 
 ## File: src/ocupacion/ocupacion.module.ts
@@ -775,226 +611,6 @@ x.sh
  8:   exports:     [OcupacionService],
  9: })
 10: export class OcupacionModule {}
-````
-
-## File: src/ocupacion/ocupacion.service.ts
-````typescript
-  1: import {
-  2:   Injectable,
-  3:   NotFoundException,
-  4:   BadRequestException,
-  5: } from '@nestjs/common';
-  6: import { PrismaService } from 'prisma/prisma.service';
-  7: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-  8: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-  9: import { AreaStatus } from '@prisma/client';
- 10: 
- 11: @Injectable()
- 12: export class OcupacionService {
- 13:   constructor(private readonly prisma: PrismaService) {}
- 14: 
- 15:   // ── CREATE ──────────────────────────────────────────────────────────────
- 16:   async create(dto: CreateOcupacionDto) {
- 17:     if (
- 18:       dto.edadMin !== undefined &&
- 19:       dto.edadMax !== undefined &&
- 20:       dto.edadMin > dto.edadMax
- 21:     ) {
- 22:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
- 23:     }
- 24: 
- 25:     // Verificar que todas las áreas existen y están LIBRES
- 26:     const areas = await this.prisma.area.findMany({
- 27:       where: { id: { in: dto.areaIds } },
- 28:     });
- 29: 
- 30:     if (areas.length !== dto.areaIds.length) {
- 31:       const found = areas.map((a) => a.id);
- 32:       const missing = dto.areaIds.filter((id) => !found.includes(id));
- 33:       throw new NotFoundException(
- 34:         `Área(s) no encontrada(s): ${missing.join(', ')}`,
- 35:       );
- 36:     }
- 37: 
- 38:     const ocupadas = areas.filter((a) => a.estado !== AreaStatus.LIBRE);
- 39:     if (ocupadas.length > 0) {
- 40:       throw new BadRequestException(
- 41:         `Las siguientes áreas no están disponibles: ${ocupadas.map((a) => a.nombre).join(', ')}`,
- 42:       );
- 43:     }
- 44: 
- 45:     // Crear ocupación + relaciones + actualizar estados en una transacción
- 46:     const ocupacion = await this.prisma.$transaction(async (tx) => {
- 47:       const nueva = await tx.ocupacion.create({
- 48:         data: {
- 49:           titulo:           dto.titulo,
- 50:           requerimiento:    dto.requerimiento,
- 51:           cantidadPersonas: dto.cantidadPersonas,
- 52:           organizador:      dto.organizador,
- 53:           dia:              dto.dia,
- 54:           hora:             dto.hora,
- 55:           edadMin:          dto.edadMin,
- 56:           edadMax:          dto.edadMax,
- 57:           anexos:           dto.anexos ?? [],
- 58:           areas: {
- 59:             create: dto.areaIds.map((areaId) => ({ areaId })),
- 60:           },
- 61:         },
- 62:         include: {
- 63:           areas: { include: { area: true } },
- 64:         },
- 65:       });
- 66: 
- 67:       // Marcar todas las áreas como OCUPADO
- 68:       await tx.area.updateMany({
- 69:         where: { id: { in: dto.areaIds } },
- 70:         data:  { estado: AreaStatus.OCUPADO },
- 71:       });
- 72: 
- 73:       return nueva;
- 74:     });
- 75: 
- 76:     return ocupacion;
- 77:   }
- 78: 
- 79:   // ── FIND ALL ────────────────────────────────────────────────────────────
- 80:   findAll() {
- 81:     return this.prisma.ocupacion.findMany({
- 82:       orderBy: { createdAt: 'desc' },
- 83:       include: {
- 84:         areas: { include: { area: true } },
- 85:       },
- 86:     });
- 87:   }
- 88: 
- 89:   // ── FIND ONE ────────────────────────────────────────────────────────────
- 90:   async findOne(id: number) {
- 91:     const ocupacion = await this.prisma.ocupacion.findUnique({
- 92:       where: { id },
- 93:       include: {
- 94:         areas: { include: { area: true } },
- 95:       },
- 96:     });
- 97:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
- 98:     return ocupacion;
- 99:   }
-100: 
-101:   // ── UPDATE ──────────────────────────────────────────────────────────────
-102:   async update(id: number, dto: UpdateOcupacionDto) {
-103:     await this.findOne(id);
-104: 
-105:     if (
-106:       dto.edadMin !== undefined &&
-107:       dto.edadMax !== undefined &&
-108:       dto.edadMin > dto.edadMax
-109:     ) {
-110:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-111:     }
-112: 
-113:     return this.prisma.$transaction(async (tx) => {
-114:       // Si se cambian las áreas, liberar las anteriores y ocupar las nuevas
-115:       if (dto.areaIds !== undefined) {
-116:         const actual = await tx.ocupacionArea.findMany({
-117:           where: { ocupacionId: id },
-118:           select: { areaId: true },
-119:         });
-120:         const idsActuales = actual.map((r) => r.areaId);
-121: 
-122:         // Validar nuevas áreas
-123:         const nuevasAreas = await tx.area.findMany({
-124:           where: { id: { in: dto.areaIds } },
-125:         });
-126:         if (nuevasAreas.length !== dto.areaIds.length) {
-127:           throw new NotFoundException('Una o más áreas no existen');
-128:         }
-129: 
-130:         // Áreas que se quitan → LIBRE; áreas que se agregan → OCUPADO
-131:         const aLiberar  = idsActuales.filter((i) => !dto.areaIds!.includes(i));
-132:         const aOcupar   = dto.areaIds.filter((i) => !idsActuales.includes(i));
-133: 
-134:         if (aLiberar.length > 0) {
-135:           await tx.area.updateMany({
-136:             where: { id: { in: aLiberar } },
-137:             data:  { estado: AreaStatus.LIBRE },
-138:           });
-139:         }
-140:         if (aOcupar.length > 0) {
-141:           await tx.area.updateMany({
-142:             where: { id: { in: aOcupar } },
-143:             data:  { estado: AreaStatus.OCUPADO },
-144:           });
-145:         }
-146: 
-147:         // Reemplazar relaciones
-148:         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-149:         await tx.ocupacionArea.createMany({
-150:           data: dto.areaIds.map((areaId) => ({ ocupacionId: id, areaId })),
-151:         });
-152:       }
-153: 
-154:       return tx.ocupacion.update({
-155:         where: { id },
-156:         data: {
-157:           ...(dto.titulo            !== undefined && { titulo:           dto.titulo }),
-158:           ...(dto.requerimiento     !== undefined && { requerimiento:    dto.requerimiento }),
-159:           ...(dto.cantidadPersonas  !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
-160:           ...(dto.organizador       !== undefined && { organizador:      dto.organizador }),
-161:           ...(dto.dia               !== undefined && { dia:              dto.dia }),
-162:           ...(dto.hora              !== undefined && { hora:             dto.hora }),
-163:           ...(dto.edadMin           !== undefined && { edadMin:          dto.edadMin }),
-164:           ...(dto.edadMax           !== undefined && { edadMax:          dto.edadMax }),
-165:           ...(dto.anexos            !== undefined && { anexos:           dto.anexos }),
-166:         },
-167:         include: {
-168:           areas: { include: { area: true } },
-169:         },
-170:       });
-171:     });
-172:   }
-173: 
-174:   // ── LIBERAR (completar ocupación) ───────────────────────────────────────
-175:   async liberar(id: number) {
-176:     const ocupacion = await this.findOne(id);
-177: 
-178:     const areaIds = ocupacion.areas.map((r) => r.areaId);
-179: 
-180:     await this.prisma.$transaction(async (tx) => {
-181:       if (areaIds.length > 0) {
-182:         await tx.area.updateMany({
-183:           where: { id: { in: areaIds } },
-184:           data:  { estado: AreaStatus.LIBRE },
-185:         });
-186:       }
-187:       await tx.ocupacion.update({
-188:         where: { id },
-189:         data:  { liberadaAt: new Date() },
-190:       });
-191:     });
-192: 
-193:     return this.findOne(id);
-194:   }
-195: 
-196:   // ── REMOVE ──────────────────────────────────────────────────────────────
-197:   async remove(id: number) {
-198:     const ocupacion = await this.findOne(id);
-199:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
-200: 
-201:     await this.prisma.$transaction(async (tx) => {
-202:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-203: 
-204:       if (areaIds.length > 0) {
-205:         await tx.area.updateMany({
-206:           where: { id: { in: areaIds } },
-207:           data:  { estado: AreaStatus.LIBRE },
-208:         });
-209:       }
-210: 
-211:       await tx.ocupacion.delete({ where: { id } });
-212:     });
-213: 
-214:     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
-215:   }
-216: }
 ````
 
 ## File: src/reserva/dto/create-reserva.dto.ts
@@ -1821,537 +1437,6 @@ x.sh
 4: }
 ````
 
-## File: x.sh
-````bash
-  1: #!/usr/bin/env bash
-  2: # =============================================================================
-  3: # back-ocupacion.sh  —  v2.0.0  —  PRODUCCIÓN
-  4: # Módulo "ocupacion" con relación many-to-many a Area (tabla OcupacionArea)
-  5: # Al crear  → áreas seleccionadas pasan a OCUPADO
-  6: # Al liberar → áreas vuelven a LIBRE
-  7: # Estados simplificados: solo LIBRE y OCUPADO
-  8: #
-  9: # ⚠️  SCHEMA MANUAL requerido ANTES de ejecutar este script.
- 10: #     Ver bloque al final del archivo.
- 11: # =============================================================================
- 12: set -euo pipefail
- 13: 
- 14: echo ""
- 15: echo "╔══════════════════════════════════════════════════════╗"
- 16: echo "║   back-ocupacion.sh — v2.0.0  (many-to-many)        ║"
- 17: echo "╚══════════════════════════════════════════════════════╝"
- 18: echo ""
- 19: 
- 20: mkdir -p src/ocupacion/dto src/ocupacion/entities
- 21: 
- 22: # ── 1. DTO create ─────────────────────────────────────────────────────────────
- 23: cat > src/ocupacion/dto/create-ocupacion.dto.ts << 'EOF'
- 24: import {
- 25:   IsString,
- 26:   IsOptional,
- 27:   IsInt,
- 28:   IsArray,
- 29:   IsUrl,
- 30:   Min,
- 31:   Max,
- 32:   MinLength,
- 33:   ArrayMinSize,
- 34:   ArrayMaxSize,
- 35: } from 'class-validator';
- 36: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
- 37: import { Type } from 'class-transformer';
- 38: 
- 39: export class CreateOcupacionDto {
- 40:   @ApiProperty({ description: 'Título de la ocupación / evento' })
- 41:   @IsString()
- 42:   @MinLength(3)
- 43:   titulo: string;
- 44: 
- 45:   @ApiProperty({ description: 'Requerimientos o descripción detallada' })
- 46:   @IsString()
- 47:   @MinLength(3)
- 48:   requerimiento: string;
- 49: 
- 50:   @ApiProperty({ description: 'Cantidad estimada de personas' })
- 51:   @Type(() => Number)
- 52:   @IsInt()
- 53:   @Min(1)
- 54:   cantidadPersonas: number;
- 55: 
- 56:   @ApiProperty({ description: 'Nombre del solicitante u organizador' })
- 57:   @IsString()
- 58:   @MinLength(2)
- 59:   organizador: string;
- 60: 
- 61:   @ApiProperty({ description: 'Fecha del evento (YYYY-MM-DD)' })
- 62:   @IsString()
- 63:   dia: string;
- 64: 
- 65:   @ApiProperty({ description: 'Hora del evento (HH:mm)' })
- 66:   @IsString()
- 67:   hora: string;
- 68: 
- 69:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
- 70:   @IsOptional()
- 71:   @Type(() => Number)
- 72:   @IsInt()
- 73:   @Min(0)
- 74:   @Max(120)
- 75:   edadMin?: number;
- 76: 
- 77:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
- 78:   @IsOptional()
- 79:   @Type(() => Number)
- 80:   @IsInt()
- 81:   @Min(0)
- 82:   @Max(120)
- 83:   edadMax?: number;
- 84: 
- 85:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
- 86:   @IsOptional()
- 87:   @IsArray()
- 88:   @IsUrl({}, { each: true })
- 89:   @ArrayMaxSize(10)
- 90:   anexos?: string[];
- 91: 
- 92:   @ApiProperty({
- 93:     description: 'IDs de las áreas del coworking a ocupar',
- 94:     type: [Number],
- 95:   })
- 96:   @IsArray()
- 97:   @ArrayMinSize(1)
- 98:   @Type(() => Number)
- 99:   @IsInt({ each: true })
-100:   areaIds: number[];
-101: }
-102: EOF
-103: echo "✅  src/ocupacion/dto/create-ocupacion.dto.ts"
-104: 
-105: # ── 2. DTO update ─────────────────────────────────────────────────────────────
-106: cat > src/ocupacion/dto/update-ocupacion.dto.ts << 'EOF'
-107: import { PartialType } from '@nestjs/swagger';
-108: import { CreateOcupacionDto } from './create-ocupacion.dto';
-109: 
-110: export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
-111: EOF
-112: echo "✅  src/ocupacion/dto/update-ocupacion.dto.ts"
-113: 
-114: # ── 3. Entity placeholder ─────────────────────────────────────────────────────
-115: cat > src/ocupacion/entities/ocupacion.entity.ts << 'EOF'
-116: export class Ocupacion {}
-117: EOF
-118: echo "✅  src/ocupacion/entities/ocupacion.entity.ts"
-119: 
-120: # ── 4. Service ────────────────────────────────────────────────────────────────
-121: cat > src/ocupacion/ocupacion.service.ts << 'EOF'
-122: import {
-123:   Injectable,
-124:   NotFoundException,
-125:   BadRequestException,
-126: } from '@nestjs/common';
-127: import { PrismaService } from 'prisma/prisma.service';
-128: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-129: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-130: import { AreaStatus } from '@prisma/client';
-131: 
-132: @Injectable()
-133: export class OcupacionService {
-134:   constructor(private readonly prisma: PrismaService) {}
-135: 
-136:   // ── CREATE ──────────────────────────────────────────────────────────────
-137:   async create(dto: CreateOcupacionDto) {
-138:     if (
-139:       dto.edadMin !== undefined &&
-140:       dto.edadMax !== undefined &&
-141:       dto.edadMin > dto.edadMax
-142:     ) {
-143:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-144:     }
-145: 
-146:     // Verificar que todas las áreas existen y están LIBRES
-147:     const areas = await this.prisma.area.findMany({
-148:       where: { id: { in: dto.areaIds } },
-149:     });
-150: 
-151:     if (areas.length !== dto.areaIds.length) {
-152:       const found = areas.map((a) => a.id);
-153:       const missing = dto.areaIds.filter((id) => !found.includes(id));
-154:       throw new NotFoundException(
-155:         `Área(s) no encontrada(s): ${missing.join(', ')}`,
-156:       );
-157:     }
-158: 
-159:     const ocupadas = areas.filter((a) => a.estado !== AreaStatus.LIBRE);
-160:     if (ocupadas.length > 0) {
-161:       throw new BadRequestException(
-162:         `Las siguientes áreas no están disponibles: ${ocupadas.map((a) => a.nombre).join(', ')}`,
-163:       );
-164:     }
-165: 
-166:     // Crear ocupación + relaciones + actualizar estados en una transacción
-167:     const ocupacion = await this.prisma.$transaction(async (tx) => {
-168:       const nueva = await tx.ocupacion.create({
-169:         data: {
-170:           titulo:           dto.titulo,
-171:           requerimiento:    dto.requerimiento,
-172:           cantidadPersonas: dto.cantidadPersonas,
-173:           organizador:      dto.organizador,
-174:           dia:              dto.dia,
-175:           hora:             dto.hora,
-176:           edadMin:          dto.edadMin,
-177:           edadMax:          dto.edadMax,
-178:           anexos:           dto.anexos ?? [],
-179:           areas: {
-180:             create: dto.areaIds.map((areaId) => ({ areaId })),
-181:           },
-182:         },
-183:         include: {
-184:           areas: { include: { area: true } },
-185:         },
-186:       });
-187: 
-188:       // Marcar todas las áreas como OCUPADO
-189:       await tx.area.updateMany({
-190:         where: { id: { in: dto.areaIds } },
-191:         data:  { estado: AreaStatus.OCUPADO },
-192:       });
-193: 
-194:       return nueva;
-195:     });
-196: 
-197:     return ocupacion;
-198:   }
-199: 
-200:   // ── FIND ALL ────────────────────────────────────────────────────────────
-201:   findAll() {
-202:     return this.prisma.ocupacion.findMany({
-203:       orderBy: { createdAt: 'desc' },
-204:       include: {
-205:         areas: { include: { area: true } },
-206:       },
-207:     });
-208:   }
-209: 
-210:   // ── FIND ONE ────────────────────────────────────────────────────────────
-211:   async findOne(id: number) {
-212:     const ocupacion = await this.prisma.ocupacion.findUnique({
-213:       where: { id },
-214:       include: {
-215:         areas: { include: { area: true } },
-216:       },
-217:     });
-218:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
-219:     return ocupacion;
-220:   }
-221: 
-222:   // ── UPDATE ──────────────────────────────────────────────────────────────
-223:   async update(id: number, dto: UpdateOcupacionDto) {
-224:     await this.findOne(id);
-225: 
-226:     if (
-227:       dto.edadMin !== undefined &&
-228:       dto.edadMax !== undefined &&
-229:       dto.edadMin > dto.edadMax
-230:     ) {
-231:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-232:     }
-233: 
-234:     return this.prisma.$transaction(async (tx) => {
-235:       // Si se cambian las áreas, liberar las anteriores y ocupar las nuevas
-236:       if (dto.areaIds !== undefined) {
-237:         const actual = await tx.ocupacionArea.findMany({
-238:           where: { ocupacionId: id },
-239:           select: { areaId: true },
-240:         });
-241:         const idsActuales = actual.map((r) => r.areaId);
-242: 
-243:         // Validar nuevas áreas
-244:         const nuevasAreas = await tx.area.findMany({
-245:           where: { id: { in: dto.areaIds } },
-246:         });
-247:         if (nuevasAreas.length !== dto.areaIds.length) {
-248:           throw new NotFoundException('Una o más áreas no existen');
-249:         }
-250: 
-251:         // Áreas que se quitan → LIBRE; áreas que se agregan → OCUPADO
-252:         const aLiberar  = idsActuales.filter((i) => !dto.areaIds!.includes(i));
-253:         const aOcupar   = dto.areaIds.filter((i) => !idsActuales.includes(i));
-254: 
-255:         if (aLiberar.length > 0) {
-256:           await tx.area.updateMany({
-257:             where: { id: { in: aLiberar } },
-258:             data:  { estado: AreaStatus.LIBRE },
-259:           });
-260:         }
-261:         if (aOcupar.length > 0) {
-262:           await tx.area.updateMany({
-263:             where: { id: { in: aOcupar } },
-264:             data:  { estado: AreaStatus.OCUPADO },
-265:           });
-266:         }
-267: 
-268:         // Reemplazar relaciones
-269:         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-270:         await tx.ocupacionArea.createMany({
-271:           data: dto.areaIds.map((areaId) => ({ ocupacionId: id, areaId })),
-272:         });
-273:       }
-274: 
-275:       return tx.ocupacion.update({
-276:         where: { id },
-277:         data: {
-278:           ...(dto.titulo            !== undefined && { titulo:           dto.titulo }),
-279:           ...(dto.requerimiento     !== undefined && { requerimiento:    dto.requerimiento }),
-280:           ...(dto.cantidadPersonas  !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
-281:           ...(dto.organizador       !== undefined && { organizador:      dto.organizador }),
-282:           ...(dto.dia               !== undefined && { dia:              dto.dia }),
-283:           ...(dto.hora              !== undefined && { hora:             dto.hora }),
-284:           ...(dto.edadMin           !== undefined && { edadMin:          dto.edadMin }),
-285:           ...(dto.edadMax           !== undefined && { edadMax:          dto.edadMax }),
-286:           ...(dto.anexos            !== undefined && { anexos:           dto.anexos }),
-287:         },
-288:         include: {
-289:           areas: { include: { area: true } },
-290:         },
-291:       });
-292:     });
-293:   }
-294: 
-295:   // ── LIBERAR (completar ocupación) ───────────────────────────────────────
-296:   async liberar(id: number) {
-297:     const ocupacion = await this.findOne(id);
-298: 
-299:     const areaIds = ocupacion.areas.map((r) => r.areaId);
-300: 
-301:     await this.prisma.$transaction(async (tx) => {
-302:       if (areaIds.length > 0) {
-303:         await tx.area.updateMany({
-304:           where: { id: { in: areaIds } },
-305:           data:  { estado: AreaStatus.LIBRE },
-306:         });
-307:       }
-308:       await tx.ocupacion.update({
-309:         where: { id },
-310:         data:  { liberadaAt: new Date() },
-311:       });
-312:     });
-313: 
-314:     return this.findOne(id);
-315:   }
-316: 
-317:   // ── REMOVE ──────────────────────────────────────────────────────────────
-318:   async remove(id: number) {
-319:     const ocupacion = await this.findOne(id);
-320:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
-321: 
-322:     await this.prisma.$transaction(async (tx) => {
-323:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-324: 
-325:       if (areaIds.length > 0) {
-326:         await tx.area.updateMany({
-327:           where: { id: { in: areaIds } },
-328:           data:  { estado: AreaStatus.LIBRE },
-329:         });
-330:       }
-331: 
-332:       await tx.ocupacion.delete({ where: { id } });
-333:     });
-334: 
-335:     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
-336:   }
-337: }
-338: EOF
-339: echo "✅  src/ocupacion/ocupacion.service.ts"
-340: 
-341: # ── 5. Controller ─────────────────────────────────────────────────────────────
-342: cat > src/ocupacion/ocupacion.controller.ts << 'EOF'
-343: import {
-344:   Controller,
-345:   Get,
-346:   Post,
-347:   Patch,
-348:   Delete,
-349:   Param,
-350:   Body,
-351:   ParseIntPipe,
-352:   HttpCode,
-353:   HttpStatus,
-354:   UsePipes,
-355:   ValidationPipe,
-356: } from '@nestjs/common';
-357: import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-358: import { OcupacionService } from './ocupacion.service';
-359: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-360: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-361: 
-362: @ApiTags('ocupaciones')
-363: @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-364: @Controller('ocupaciones')
-365: export class OcupacionController {
-366:   constructor(private readonly ocupacionService: OcupacionService) {}
-367: 
-368:   @Post()
-369:   @HttpCode(HttpStatus.CREATED)
-370:   @ApiOperation({ summary: 'Crear ocupación y marcar áreas como OCUPADO' })
-371:   @ApiResponse({ status: 201, description: 'Ocupación creada' })
-372:   @ApiResponse({ status: 400, description: 'Datos inválidos o áreas no disponibles' })
-373:   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
-374:   create(@Body() dto: CreateOcupacionDto) {
-375:     return this.ocupacionService.create(dto);
-376:   }
-377: 
-378:   @Get()
-379:   @ApiOperation({ summary: 'Listar todas las ocupaciones con sus áreas' })
-380:   findAll() {
-381:     return this.ocupacionService.findAll();
-382:   }
-383: 
-384:   @Get(':id')
-385:   @ApiOperation({ summary: 'Obtener una ocupación por ID' })
-386:   @ApiResponse({ status: 404, description: 'No encontrada' })
-387:   findOne(@Param('id', ParseIntPipe) id: number) {
-388:     return this.ocupacionService.findOne(id);
-389:   }
-390: 
-391:   @Patch(':id')
-392:   @ApiOperation({ summary: 'Actualizar ocupación (también actualiza áreas si se envía areaIds)' })
-393:   update(
-394:     @Param('id', ParseIntPipe) id: number,
-395:     @Body() dto: UpdateOcupacionDto,
-396:   ) {
-397:     return this.ocupacionService.update(id, dto);
-398:   }
-399: 
-400:   @Patch(':id/liberar')
-401:   @ApiOperation({ summary: 'Liberar ocupación → áreas vuelven a LIBRE' })
-402:   liberar(@Param('id', ParseIntPipe) id: number) {
-403:     return this.ocupacionService.liberar(id);
-404:   }
-405: 
-406:   @Delete(':id')
-407:   @HttpCode(HttpStatus.NO_CONTENT)
-408:   @ApiOperation({ summary: 'Eliminar ocupación y liberar sus áreas' })
-409:   remove(@Param('id', ParseIntPipe) id: number) {
-410:     return this.ocupacionService.remove(id);
-411:   }
-412: }
-413: EOF
-414: echo "✅  src/ocupacion/ocupacion.controller.ts"
-415: 
-416: # ── 6. Module ─────────────────────────────────────────────────────────────────
-417: cat > src/ocupacion/ocupacion.module.ts << 'EOF'
-418: import { Module } from '@nestjs/common';
-419: import { OcupacionService } from './ocupacion.service';
-420: import { OcupacionController } from './ocupacion.controller';
-421: 
-422: @Module({
-423:   controllers: [OcupacionController],
-424:   providers:   [OcupacionService],
-425:   exports:     [OcupacionService],
-426: })
-427: export class OcupacionModule {}
-428: EOF
-429: echo "✅  src/ocupacion/ocupacion.module.ts"
-430: 
-431: # ── 7. Registrar en AppModule ─────────────────────────────────────────────────
-432: if grep -q "OcupacionModule" src/app.module.ts; then
-433:   echo "ℹ️   OcupacionModule ya estaba registrado"
-434: else
-435:   sed -i "1s/^/import { OcupacionModule } from '.\/ocupacion\/ocupacion.module';\n/" src/app.module.ts
-436:   sed -i "s/AuthModule,/AuthModule,\n    OcupacionModule,/" src/app.module.ts
-437:   echo "✅  OcupacionModule registrado en app.module.ts"
-438: fi
-439: 
-440: # ── 8. ValidationPipe global en main.ts ──────────────────────────────────────
-441: if grep -q "useGlobalPipes" src/main.ts; then
-442:   echo "ℹ️   ValidationPipe global ya presente"
-443: else
-444:   sed -i "s/app\.enableCors/app.useGlobalPipes(new (require('@nestjs\/common').ValidationPipe)({ transform: true, whitelist: true }));\n\n  app.enableCors/" src/main.ts
-445:   echo "✅  ValidationPipe global añadido"
-446: fi
-447: 
-448: # ── 9. Dependencias ───────────────────────────────────────────────────────────
-449: echo ""
-450: echo "📦  Verificando class-validator / class-transformer..."
-451: if ! grep -q '"class-validator"' package.json; then
-452:   pnpm add class-validator class-transformer
-453:   echo "✅  Dependencias instaladas"
-454: else
-455:   echo "ℹ️   class-validator ya presente"
-456: fi
-457: 
-458: # ── 10. Build ─────────────────────────────────────────────────────────────────
-459: echo ""
-460: echo "🔨  Compilando..."
-461: pnpm build
-462: 
-463: echo ""
-464: echo "╔══════════════════════════════════════════════════════════════════╗"
-465: echo "║  ✅  back-ocupacion.sh v2 completado                            ║"
-466: echo "╚══════════════════════════════════════════════════════════════════╝"
-467: echo ""
-468: echo "  Endpoints disponibles:"
-469: echo "    POST   /ocupaciones           → crea y ocupa áreas"
-470: echo "    GET    /ocupaciones           → lista con áreas incluidas"
-471: echo "    GET    /ocupaciones/:id"
-472: echo "    PATCH  /ocupaciones/:id       → actualiza (incluso áreas)"
-473: echo "    PATCH  /ocupaciones/:id/liberar → libera áreas → LIBRE"
-474: echo "    DELETE /ocupaciones/:id       → elimina y libera áreas"
-475: echo ""
-476: echo "════════════════════════════════════════════════════════════════════"
-477: echo "  ⚠️  SCHEMA MANUAL — Agregar a prisma/schema.prisma:"
-478: echo "════════════════════════════════════════════════════════════════════"
-479: cat << 'SCHEMA'
-480: 
-481: // ── Simplificar AreaStatus a solo dos estados ──────────────────────────────
-482: // REEMPLAZÁ el enum existente por este:
-483: enum AreaStatus {
-484:   LIBRE
-485:   OCUPADO
-486: }
-487: 
-488: // ── Nuevo modelo Ocupacion ─────────────────────────────────────────────────
-489: model Ocupacion {
-490:   id               Int             @id @default(autoincrement())
-491:   titulo           String
-492:   requerimiento    String
-493:   cantidadPersonas Int
-494:   organizador      String
-495:   dia              String
-496:   hora             String
-497:   edadMin          Int?
-498:   edadMax          Int?
-499:   anexos           String[]
-500:   liberadaAt       DateTime?
-501:   areas            OcupacionArea[]
-502:   createdAt        DateTime        @default(now())
-503:   updatedAt        DateTime        @updatedAt
-504: }
-505: 
-506: // ── Tabla intermedia many-to-many ──────────────────────────────────────────
-507: model OcupacionArea {
-508:   ocupacionId Int
-509:   areaId      Int
-510:   ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
-511:   area        Area      @relation(fields: [areaId], references: [id])
-512: 
-513:   @@id([ocupacionId, areaId])
-514: }
-515: 
-516: // ── En el modelo Area existente, agregar la relación inversa: ──────────────
-517: // areas  OcupacionArea[]    ← agregar esta línea dentro del model Area
-518: 
-519: SCHEMA
-520: echo ""
-521: echo "  ⚠️  El enum AreaStatus cambia — revisá que los datos existentes"
-522: echo "     solo tengan LIBRE u OCUPADO antes de migrar."
-523: echo ""
-524: echo "  Luego ejecutá:"
-525: echo "    npx prisma migrate dev --name add_ocupacion_many_to_many"
-526: echo "    npx prisma generate"
-527: echo ""
-````
-
 ## File: src/area/area.service.ts
 ````typescript
  1: import { Injectable } from '@nestjs/common';
@@ -2401,6 +1486,499 @@ x.sh
 45:     });
 46:   }
 47: }
+````
+
+## File: src/ocupacion/dto/create-ocupacion.dto.ts
+````typescript
+ 1: import {
+ 2:   IsString,
+ 3:   IsOptional,
+ 4:   IsInt,
+ 5:   IsArray,
+ 6:   IsUrl,
+ 7:   IsDateString,
+ 8:   Matches,
+ 9:   Min,
+10:   Max,
+11:   MinLength,
+12:   ArrayMinSize,
+13:   ArrayMaxSize,
+14: } from 'class-validator';
+15: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+16: import { Type } from 'class-transformer';
+17: 
+18: export class CreateOcupacionDto {
+19:   @ApiProperty({ description: 'Título del evento / ocupación' })
+20:   @IsString()
+21:   @MinLength(3)
+22:   titulo: string;
+23: 
+24:   @ApiProperty({ description: 'Requerimientos o descripción' })
+25:   @IsString()
+26:   @MinLength(3)
+27:   requerimiento: string;
+28: 
+29:   @ApiProperty({ description: 'Cantidad estimada de personas' })
+30:   @Type(() => Number)
+31:   @IsInt()
+32:   @Min(1)
+33:   cantidadPersonas: number;
+34: 
+35:   @ApiProperty({ description: 'Nombre del organizador / solicitante' })
+36:   @IsString()
+37:   @MinLength(2)
+38:   organizador: string;
+39: 
+40:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
+41:   @IsDateString()
+42:   fechaDesde: string;
+43: 
+44:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
+45:   @IsDateString()
+46:   fechaHasta: string;
+47: 
+48:   @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
+49:   @IsString()
+50:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
+51:   horaDesde: string;
+52: 
+53:   @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
+54:   @IsString()
+55:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
+56:   horaHasta: string;
+57: 
+58:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
+59:   @IsOptional()
+60:   @Type(() => Number)
+61:   @IsInt()
+62:   @Min(0)
+63:   @Max(120)
+64:   edadMin?: number;
+65: 
+66:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
+67:   @IsOptional()
+68:   @Type(() => Number)
+69:   @IsInt()
+70:   @Min(0)
+71:   @Max(120)
+72:   edadMax?: number;
+73: 
+74:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
+75:   @IsOptional()
+76:   @IsArray()
+77:   @IsUrl({}, { each: true })
+78:   @ArrayMaxSize(10)
+79:   anexos?: string[];
+80: 
+81:   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
+82:   @IsArray()
+83:   @ArrayMinSize(1)
+84:   @Type(() => Number)
+85:   @IsInt({ each: true })
+86:   areaIds: number[];
+87: }
+````
+
+## File: src/ocupacion/dto/update-ocupacion.dto.ts
+````typescript
+1: import { PartialType } from '@nestjs/swagger';
+2: import { CreateOcupacionDto } from './create-ocupacion.dto';
+3: export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
+````
+
+## File: src/ocupacion/ocupacion.controller.ts
+````typescript
+ 1: import {
+ 2:   Controller,
+ 3:   Get,
+ 4:   Post,
+ 5:   Patch,
+ 6:   Delete,
+ 7:   Param,
+ 8:   Body,
+ 9:   ParseIntPipe,
+10:   HttpCode,
+11:   HttpStatus,
+12:   UsePipes,
+13:   ValidationPipe,
+14: } from '@nestjs/common';
+15: import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+16: import { OcupacionService } from './ocupacion.service';
+17: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+18: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
+19: 
+20: @ApiTags('ocupaciones')
+21: @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+22: @Controller('ocupaciones')
+23: export class OcupacionController {
+24:   constructor(private readonly ocupacionService: OcupacionService) {}
+25: 
+26:   @Post()
+27:   @HttpCode(HttpStatus.CREATED)
+28:   @ApiOperation({ summary: 'Crear ocupación — valida conflictos de horario y marca áreas OCUPADO' })
+29:   @ApiResponse({ status: 201, description: 'Ocupación creada' })
+30:   @ApiResponse({ status: 400, description: 'Datos inválidos o conflicto de horario' })
+31:   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
+32:   create(@Body() dto: CreateOcupacionDto) {
+33:     return this.ocupacionService.create(dto);
+34:   }
+35: 
+36:   @Get()
+37:   @ApiOperation({ summary: 'Listar todas las ocupaciones' })
+38:   findAll() {
+39:     return this.ocupacionService.findAll();
+40:   }
+41: 
+42:   @Get('activas')
+43:   @ApiOperation({ summary: 'Listar ocupaciones activas (sin liberadaAt, desde hoy)' })
+44:   findActivas() {
+45:     return this.ocupacionService.findActivas();
+46:   }
+47: 
+48:   @Get(':id')
+49:   @ApiOperation({ summary: 'Obtener una ocupación por ID' })
+50:   @ApiResponse({ status: 404, description: 'No encontrada' })
+51:   findOne(@Param('id', ParseIntPipe) id: number) {
+52:     return this.ocupacionService.findOne(id);
+53:   }
+54: 
+55:   @Patch(':id')
+56:   @ApiOperation({ summary: 'Actualizar ocupación — revalida conflictos si cambia horario/áreas' })
+57:   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOcupacionDto) {
+58:     return this.ocupacionService.update(id, dto);
+59:   }
+60: 
+61:   @Patch(':id/liberar')
+62:   @ApiOperation({ summary: 'Liberar ocupación manualmente → áreas vuelven a LIBRE' })
+63:   liberar(@Param('id', ParseIntPipe) id: number) {
+64:     return this.ocupacionService.liberar(id);
+65:   }
+66: 
+67:   @Delete(':id')
+68:   @HttpCode(HttpStatus.NO_CONTENT)
+69:   @ApiOperation({ summary: 'Eliminar ocupación y liberar sus áreas' })
+70:   remove(@Param('id', ParseIntPipe) id: number) {
+71:     return this.ocupacionService.remove(id);
+72:   }
+73: }
+````
+
+## File: src/ocupacion/ocupacion.service.ts
+````typescript
+  1: import {
+  2:   Injectable,
+  3:   NotFoundException,
+  4:   BadRequestException,
+  5:   Logger,
+  6: } from '@nestjs/common';
+  7: import { Cron } from '@nestjs/schedule';
+  8: import { PrismaService } from 'prisma/prisma.service';
+  9: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+ 10: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
+ 11: import { AreaStatus } from '@prisma/client';
+ 12: 
+ 13: // ── Helpers de tiempo ─────────────────────────────────────────────────────────
+ 14: 
+ 15: function timeToMinutes(hhmm: string): number {
+ 16:   const [h, m] = hhmm.split(':').map(Number);
+ 17:   return h * 60 + m;
+ 18: }
+ 19: 
+ 20: /** Construye un DateTime UTC combinando fecha YYYY-MM-DD y hora HH:mm */
+ 21: function buildDatetime(fecha: string, hora: string): Date {
+ 22:   return new Date(`${fecha}T${hora}:00.000Z`);
+ 23: }
+ 24: 
+ 25: /** Fecha local Argentina como YYYY-MM-DD (UTC-3) */
+ 26: function hoyArgentina(): string {
+ 27:   const ahora = new Date();
+ 28:   ahora.setHours(ahora.getHours() - 3); // UTC-3
+ 29:   return ahora.toISOString().split('T')[0];
+ 30: }
+ 31: 
+ 32: @Injectable()
+ 33: export class OcupacionService {
+ 34:   private readonly logger = new Logger(OcupacionService.name);
+ 35: 
+ 36:   constructor(private readonly prisma: PrismaService) {}
+ 37: 
+ 38:   // ── Verifica conflicto de horario para un área ────────────────────────────
+ 39:   private async verificarConflicto(
+ 40:     areaIds: number[],
+ 41:     fechaDesde: string,
+ 42:     fechaHasta: string,
+ 43:     horaDesde: string,
+ 44:     horaHasta: string,
+ 45:     excludeId?: number,
+ 46:   ): Promise<void> {
+ 47:     // Buscar ocupaciones activas (sin liberadaAt) que se superpongan en fecha
+ 48:     const ocupacionesActivas = await this.prisma.ocupacion.findMany({
+ 49:       where: {
+ 50:         liberadaAt: null,
+ 51:         ...(excludeId ? { id: { not: excludeId } } : {}),
+ 52:         areas: { some: { areaId: { in: areaIds } } },
+ 53:         // Superposición de rango de fechas
+ 54:         AND: [
+ 55:           { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
+ 56:           { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
+ 57:         ],
+ 58:       },
+ 59:       include: { areas: { include: { area: true } } },
+ 60:     });
+ 61: 
+ 62:     // Para cada ocupación con fecha solapada, verificar superposición de horario
+ 63:     const nuevaInicio = timeToMinutes(horaDesde);
+ 64:     const nuevaFin    = timeToMinutes(horaHasta);
+ 65: 
+ 66:     for (const oc of ocupacionesActivas) {
+ 67:       const existInicio = timeToMinutes(oc.horaDesde);
+ 68:       const existFin    = timeToMinutes(oc.horaHasta);
+ 69: 
+ 70:       // Hay solapamiento si los rangos se intersectan
+ 71:       const solapan = nuevaInicio < existFin && nuevaFin > existInicio;
+ 72:       if (!solapan) continue;
+ 73: 
+ 74:       const areasConflicto = oc.areas
+ 75:         .filter((r) => areaIds.includes(r.areaId))
+ 76:         .map((r) => r.area.nombre)
+ 77:         .join(', ');
+ 78: 
+ 79:       throw new BadRequestException(
+ 80:         `Conflicto de horario: las áreas [${areasConflicto}] ya están ocupadas ` +
+ 81:         `el ${oc.fechaDesde.toISOString().split('T')[0]} de ${oc.horaDesde} a ${oc.horaHasta} ` +
+ 82:         `(ocupación "${oc.titulo}")`,
+ 83:       );
+ 84:     }
+ 85:   }
+ 86: 
+ 87:   // ── CREATE ────────────────────────────────────────────────────────────────
+ 88:   async create(dto: CreateOcupacionDto) {
+ 89:     // Validaciones básicas
+ 90:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
+ 91:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
+ 92:     }
+ 93:     if (dto.fechaDesde > dto.fechaHasta) {
+ 94:       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+ 95:     }
+ 96:     if (dto.fechaDesde === dto.fechaHasta && dto.horaDesde >= dto.horaHasta) {
+ 97:       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+ 98:     }
+ 99: 
+100:     // Verificar que las áreas existen
+101:     const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
+102:     if (areas.length !== dto.areaIds.length) {
+103:       const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
+104:       throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
+105:     }
+106: 
+107:     // Verificar conflicto de horario
+108:     await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
+109: 
+110:     // Crear ocupación + marcar áreas OCUPADO en transacción
+111:     const ocupacion = await this.prisma.$transaction(async (tx) => {
+112:       const nueva = await tx.ocupacion.create({
+113:         data: {
+114:           titulo:           dto.titulo,
+115:           requerimiento:    dto.requerimiento,
+116:           cantidadPersonas: dto.cantidadPersonas,
+117:           organizador:      dto.organizador,
+118:           fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`),
+119:           fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`),
+120:           horaDesde:        dto.horaDesde,
+121:           horaHasta:        dto.horaHasta,
+122:           edadMin:          dto.edadMin,
+123:           edadMax:          dto.edadMax,
+124:           anexos:           dto.anexos ?? [],
+125:           areas: { create: dto.areaIds.map((areaId) => ({ areaId })) },
+126:         },
+127:         include: { areas: { include: { area: true } } },
+128:       });
+129: 
+130:       await tx.area.updateMany({
+131:         where: { id: { in: dto.areaIds } },
+132:         data:  { estado: AreaStatus.OCUPADO },
+133:       });
+134: 
+135:       return nueva;
+136:     });
+137: 
+138:     return ocupacion;
+139:   }
+140: 
+141:   // ── FIND ALL ──────────────────────────────────────────────────────────────
+142:   findAll() {
+143:     return this.prisma.ocupacion.findMany({
+144:       orderBy: { fechaDesde: 'asc' },
+145:       include: { areas: { include: { area: true } } },
+146:     });
+147:   }
+148: 
+149:   // ── FIND ACTIVAS (sin liberadaAt, desde hoy) ──────────────────────────────
+150:   findActivas() {
+151:     const hoy = new Date(`${hoyArgentina()}T00:00:00.000Z`);
+152:     return this.prisma.ocupacion.findMany({
+153:       where: {
+154:         liberadaAt: null,
+155:         fechaHasta: { gte: hoy },
+156:       },
+157:       orderBy: { fechaDesde: 'asc' },
+158:       include: { areas: { include: { area: true } } },
+159:     });
+160:   }
+161: 
+162:   // ── FIND ONE ──────────────────────────────────────────────────────────────
+163:   async findOne(id: number) {
+164:     const ocupacion = await this.prisma.ocupacion.findUnique({
+165:       where: { id },
+166:       include: { areas: { include: { area: true } } },
+167:     });
+168:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
+169:     return ocupacion;
+170:   }
+171: 
+172:   // ── UPDATE ────────────────────────────────────────────────────────────────
+173:   async update(id: number, dto: UpdateOcupacionDto) {
+174:     const actual = await this.findOne(id);
+175: 
+176:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
+177:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
+178:     }
+179: 
+180:     // Si cambió el horario/fecha, verificar conflictos excluyendo esta misma ocupación
+181:     const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
+182:     const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
+183:     const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
+184:     const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
+185:     const areaIds    = dto.areaIds    ?? actual.areas.map((r) => r.areaId);
+186: 
+187:     if (dto.fechaDesde || dto.fechaHasta || dto.horaDesde || dto.horaHasta || dto.areaIds) {
+188:       await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
+189:     }
+190: 
+191:     // Si cambian las áreas, actualizar relaciones y estados
+192:     if (dto.areaIds) {
+193:       const anterioresIds = actual.areas.map((r) => r.areaId);
+194:       await this.prisma.$transaction(async (tx) => {
+195:         // Liberar áreas que ya no están
+196:         const aLiberar = anterioresIds.filter((aid) => !dto.areaIds!.includes(aid));
+197:         if (aLiberar.length > 0) {
+198:           await tx.area.updateMany({ where: { id: { in: aLiberar } }, data: { estado: AreaStatus.LIBRE } });
+199:         }
+200:         // Ocupar áreas nuevas
+201:         const aNuevas = dto.areaIds!.filter((aid) => !anterioresIds.includes(aid));
+202:         if (aNuevas.length > 0) {
+203:           await tx.area.updateMany({ where: { id: { in: aNuevas } }, data: { estado: AreaStatus.OCUPADO } });
+204:         }
+205:         // Reemplazar relaciones
+206:         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+207:         await tx.ocupacionArea.createMany({
+208:           data: dto.areaIds!.map((areaId) => ({ ocupacionId: id, areaId })),
+209:         });
+210:       });
+211:     }
+212: 
+213:     return this.prisma.ocupacion.update({
+214:       where: { id },
+215:       data: {
+216:         ...(dto.titulo           !== undefined && { titulo:           dto.titulo }),
+217:         ...(dto.requerimiento    !== undefined && { requerimiento:    dto.requerimiento }),
+218:         ...(dto.cantidadPersonas !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
+219:         ...(dto.organizador      !== undefined && { organizador:      dto.organizador }),
+220:         ...(dto.fechaDesde       !== undefined && { fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`) }),
+221:         ...(dto.fechaHasta       !== undefined && { fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`) }),
+222:         ...(dto.horaDesde        !== undefined && { horaDesde:        dto.horaDesde }),
+223:         ...(dto.horaHasta        !== undefined && { horaHasta:        dto.horaHasta }),
+224:         ...(dto.edadMin          !== undefined && { edadMin:          dto.edadMin }),
+225:         ...(dto.edadMax          !== undefined && { edadMax:          dto.edadMax }),
+226:         ...(dto.anexos           !== undefined && { anexos:           dto.anexos }),
+227:       },
+228:       include: { areas: { include: { area: true } } },
+229:     });
+230:   }
+231: 
+232:   // ── LIBERAR MANUAL ────────────────────────────────────────────────────────
+233:   async liberar(id: number) {
+234:     const ocupacion = await this.findOne(id);
+235:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
+236: 
+237:     await this.prisma.$transaction(async (tx) => {
+238:       if (areaIds.length > 0) {
+239:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+240:       }
+241:       await tx.ocupacion.update({ where: { id }, data: { liberadaAt: new Date() } });
+242:     });
+243: 
+244:     return this.findOne(id);
+245:   }
+246: 
+247:   // ── REMOVE ────────────────────────────────────────────────────────────────
+248:   async remove(id: number) {
+249:     const ocupacion = await this.findOne(id);
+250:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
+251: 
+252:     await this.prisma.$transaction(async (tx) => {
+253:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+254:       if (areaIds.length > 0) {
+255:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+256:       }
+257:       await tx.ocupacion.delete({ where: { id } });
+258:     });
+259: 
+260:     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
+261:   }
+262: 
+263:   // ── CRON: auto-liberar áreas cuando termina el evento ────────────────────
+264:   // Corre cada minuto. Libera ocupaciones donde fechaHasta+horaHasta < ahora
+265:   @Cron('* * * * *')
+266:   async autoLiberarVencidas() {
+267:     const ahora      = new Date();
+268:     const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000); // UTC-3
+269:     const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
+270:     const minutosNow = ahoraUTC3.getHours() * 60 + ahoraUTC3.getMinutes();
+271: 
+272:     try {
+273:       // Buscar ocupaciones activas cuya fechaHasta ya pasó o es hoy y horaHasta ya pasó
+274:       const candidatas = await this.prisma.ocupacion.findMany({
+275:         where: {
+276:           liberadaAt: null,
+277:           fechaHasta: { lte: new Date(`${fechaHoy}T23:59:59.000Z`) },
+278:         },
+279:         include: { areas: { include: { area: true } } },
+280:       });
+281: 
+282:       for (const oc of candidatas) {
+283:         const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
+284: 
+285:         // Si la fecha de fin ya pasó completamente
+286:         if (fechaFin < fechaHoy) {
+287:           await this.liberarInterno(oc);
+288:           continue;
+289:         }
+290: 
+291:         // Si es hoy, verificar que la hora ya pasó
+292:         if (fechaFin === fechaHoy) {
+293:           const minutosFin = timeToMinutes(oc.horaHasta);
+294:           if (minutosNow >= minutosFin) {
+295:             await this.liberarInterno(oc);
+296:           }
+297:         }
+298:       }
+299:     } catch (err) {
+300:       this.logger.error('Error en autoLiberarVencidas:', (err as Error).message);
+301:     }
+302:   }
+303: 
+304:   private async liberarInterno(oc: { id: number; areas: { areaId: number }[] }) {
+305:     const areaIds = oc.areas.map((r) => r.areaId);
+306:     await this.prisma.$transaction(async (tx) => {
+307:       if (areaIds.length > 0) {
+308:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+309:       }
+310:       await tx.ocupacion.update({ where: { id: oc.id }, data: { liberadaAt: new Date() } });
+311:     });
+312:     this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
+313:   }
+314: }
 ````
 
 ## File: .gitignore
@@ -2499,31 +2077,739 @@ x.sh
 30: }
 ````
 
+## File: x.sh
+````bash
+  1: #!/usr/bin/env bash
+  2: # =============================================================================
+  3: # v5-back-ocupacion-fechas.sh — v1.0.0 — PRODUCCIÓN (coworking-back)
+  4: #
+  5: # Cambios:
+  6: #  · DTO: reemplaza dia/hora por fechaDesde/fechaHasta/horaDesde/horaHasta
+  7: #  · Service: chequeo de conflicto de horario antes de crear
+  8: #  · Service: scheduler cada 1 min — auto-libera áreas cuando termina el evento
+  9: #  · Service: nuevo endpoint GET /ocupaciones/activas (para el frontend)
+ 10: #  · Controller: expone el nuevo endpoint
+ 11: #
+ 12: # ⚠️  SCHEMA YA MIGRADO MANUALMENTE antes de correr este script
+ 13: # =============================================================================
+ 14: set -euo pipefail
+ 15: 
+ 16: echo ""
+ 17: echo "╔══════════════════════════════════════════════════════════════╗"
+ 18: echo "║  v5-back-ocupacion-fechas.sh — v1.0.0                       ║"
+ 19: echo "╚══════════════════════════════════════════════════════════════╝"
+ 20: echo ""
+ 21: 
+ 22: if [ ! -f "package.json" ] || [ ! -d "src" ]; then
+ 23:   echo "❌  Corré desde la raíz del proyecto NestJS"
+ 24:   exit 1
+ 25: fi
+ 26: 
+ 27: mkdir -p src/ocupacion/dto src/ocupacion/entities
+ 28: 
+ 29: # ════════════════════════════════════════════════════════════════════════════
+ 30: # 1. DTO create
+ 31: # ════════════════════════════════════════════════════════════════════════════
+ 32: echo "📄  src/ocupacion/dto/create-ocupacion.dto.ts..."
+ 33: cat > src/ocupacion/dto/create-ocupacion.dto.ts << 'EOF'
+ 34: import {
+ 35:   IsString,
+ 36:   IsOptional,
+ 37:   IsInt,
+ 38:   IsArray,
+ 39:   IsUrl,
+ 40:   IsDateString,
+ 41:   Matches,
+ 42:   Min,
+ 43:   Max,
+ 44:   MinLength,
+ 45:   ArrayMinSize,
+ 46:   ArrayMaxSize,
+ 47: } from 'class-validator';
+ 48: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ 49: import { Type } from 'class-transformer';
+ 50: 
+ 51: export class CreateOcupacionDto {
+ 52:   @ApiProperty({ description: 'Título del evento / ocupación' })
+ 53:   @IsString()
+ 54:   @MinLength(3)
+ 55:   titulo: string;
+ 56: 
+ 57:   @ApiProperty({ description: 'Requerimientos o descripción' })
+ 58:   @IsString()
+ 59:   @MinLength(3)
+ 60:   requerimiento: string;
+ 61: 
+ 62:   @ApiProperty({ description: 'Cantidad estimada de personas' })
+ 63:   @Type(() => Number)
+ 64:   @IsInt()
+ 65:   @Min(1)
+ 66:   cantidadPersonas: number;
+ 67: 
+ 68:   @ApiProperty({ description: 'Nombre del organizador / solicitante' })
+ 69:   @IsString()
+ 70:   @MinLength(2)
+ 71:   organizador: string;
+ 72: 
+ 73:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
+ 74:   @IsDateString()
+ 75:   fechaDesde: string;
+ 76: 
+ 77:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
+ 78:   @IsDateString()
+ 79:   fechaHasta: string;
+ 80: 
+ 81:   @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
+ 82:   @IsString()
+ 83:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
+ 84:   horaDesde: string;
+ 85: 
+ 86:   @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
+ 87:   @IsString()
+ 88:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
+ 89:   horaHasta: string;
+ 90: 
+ 91:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
+ 92:   @IsOptional()
+ 93:   @Type(() => Number)
+ 94:   @IsInt()
+ 95:   @Min(0)
+ 96:   @Max(120)
+ 97:   edadMin?: number;
+ 98: 
+ 99:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
+100:   @IsOptional()
+101:   @Type(() => Number)
+102:   @IsInt()
+103:   @Min(0)
+104:   @Max(120)
+105:   edadMax?: number;
+106: 
+107:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
+108:   @IsOptional()
+109:   @IsArray()
+110:   @IsUrl({}, { each: true })
+111:   @ArrayMaxSize(10)
+112:   anexos?: string[];
+113: 
+114:   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
+115:   @IsArray()
+116:   @ArrayMinSize(1)
+117:   @Type(() => Number)
+118:   @IsInt({ each: true })
+119:   areaIds: number[];
+120: }
+121: EOF
+122: echo "✅  create-ocupacion.dto.ts"
+123: 
+124: # ════════════════════════════════════════════════════════════════════════════
+125: # 2. DTO update
+126: # ════════════════════════════════════════════════════════════════════════════
+127: cat > src/ocupacion/dto/update-ocupacion.dto.ts << 'EOF'
+128: import { PartialType } from '@nestjs/swagger';
+129: import { CreateOcupacionDto } from './create-ocupacion.dto';
+130: export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
+131: EOF
+132: echo "✅  update-ocupacion.dto.ts"
+133: 
+134: # ════════════════════════════════════════════════════════════════════════════
+135: # 3. Entity placeholder
+136: # ════════════════════════════════════════════════════════════════════════════
+137: cat > src/ocupacion/entities/ocupacion.entity.ts << 'EOF'
+138: export class Ocupacion {}
+139: EOF
+140: 
+141: # ════════════════════════════════════════════════════════════════════════════
+142: # 4. Service — conflict check + auto-liberar scheduler
+143: # ════════════════════════════════════════════════════════════════════════════
+144: echo "📄  src/ocupacion/ocupacion.service.ts..."
+145: cat > src/ocupacion/ocupacion.service.ts << 'EOF'
+146: import {
+147:   Injectable,
+148:   NotFoundException,
+149:   BadRequestException,
+150:   Logger,
+151: } from '@nestjs/common';
+152: import { Cron } from '@nestjs/schedule';
+153: import { PrismaService } from 'prisma/prisma.service';
+154: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+155: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
+156: import { AreaStatus } from '@prisma/client';
+157: 
+158: // ── Helpers de tiempo ─────────────────────────────────────────────────────────
+159: 
+160: function timeToMinutes(hhmm: string): number {
+161:   const [h, m] = hhmm.split(':').map(Number);
+162:   return h * 60 + m;
+163: }
+164: 
+165: /** Construye un DateTime UTC combinando fecha YYYY-MM-DD y hora HH:mm */
+166: function buildDatetime(fecha: string, hora: string): Date {
+167:   return new Date(`${fecha}T${hora}:00.000Z`);
+168: }
+169: 
+170: /** Fecha local Argentina como YYYY-MM-DD (UTC-3) */
+171: function hoyArgentina(): string {
+172:   const ahora = new Date();
+173:   ahora.setHours(ahora.getHours() - 3); // UTC-3
+174:   return ahora.toISOString().split('T')[0];
+175: }
+176: 
+177: @Injectable()
+178: export class OcupacionService {
+179:   private readonly logger = new Logger(OcupacionService.name);
+180: 
+181:   constructor(private readonly prisma: PrismaService) {}
+182: 
+183:   // ── Verifica conflicto de horario para un área ────────────────────────────
+184:   private async verificarConflicto(
+185:     areaIds: number[],
+186:     fechaDesde: string,
+187:     fechaHasta: string,
+188:     horaDesde: string,
+189:     horaHasta: string,
+190:     excludeId?: number,
+191:   ): Promise<void> {
+192:     // Buscar ocupaciones activas (sin liberadaAt) que se superpongan en fecha
+193:     const ocupacionesActivas = await this.prisma.ocupacion.findMany({
+194:       where: {
+195:         liberadaAt: null,
+196:         ...(excludeId ? { id: { not: excludeId } } : {}),
+197:         areas: { some: { areaId: { in: areaIds } } },
+198:         // Superposición de rango de fechas
+199:         AND: [
+200:           { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
+201:           { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
+202:         ],
+203:       },
+204:       include: { areas: { include: { area: true } } },
+205:     });
+206: 
+207:     // Para cada ocupación con fecha solapada, verificar superposición de horario
+208:     const nuevaInicio = timeToMinutes(horaDesde);
+209:     const nuevaFin    = timeToMinutes(horaHasta);
+210: 
+211:     for (const oc of ocupacionesActivas) {
+212:       const existInicio = timeToMinutes(oc.horaDesde);
+213:       const existFin    = timeToMinutes(oc.horaHasta);
+214: 
+215:       // Hay solapamiento si los rangos se intersectan
+216:       const solapan = nuevaInicio < existFin && nuevaFin > existInicio;
+217:       if (!solapan) continue;
+218: 
+219:       const areasConflicto = oc.areas
+220:         .filter((r) => areaIds.includes(r.areaId))
+221:         .map((r) => r.area.nombre)
+222:         .join(', ');
+223: 
+224:       throw new BadRequestException(
+225:         `Conflicto de horario: las áreas [${areasConflicto}] ya están ocupadas ` +
+226:         `el ${oc.fechaDesde.toISOString().split('T')[0]} de ${oc.horaDesde} a ${oc.horaHasta} ` +
+227:         `(ocupación "${oc.titulo}")`,
+228:       );
+229:     }
+230:   }
+231: 
+232:   // ── CREATE ────────────────────────────────────────────────────────────────
+233:   async create(dto: CreateOcupacionDto) {
+234:     // Validaciones básicas
+235:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
+236:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
+237:     }
+238:     if (dto.fechaDesde > dto.fechaHasta) {
+239:       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+240:     }
+241:     if (dto.fechaDesde === dto.fechaHasta && dto.horaDesde >= dto.horaHasta) {
+242:       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+243:     }
+244: 
+245:     // Verificar que las áreas existen
+246:     const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
+247:     if (areas.length !== dto.areaIds.length) {
+248:       const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
+249:       throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
+250:     }
+251: 
+252:     // Verificar conflicto de horario
+253:     await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
+254: 
+255:     // Crear ocupación + marcar áreas OCUPADO en transacción
+256:     const ocupacion = await this.prisma.$transaction(async (tx) => {
+257:       const nueva = await tx.ocupacion.create({
+258:         data: {
+259:           titulo:           dto.titulo,
+260:           requerimiento:    dto.requerimiento,
+261:           cantidadPersonas: dto.cantidadPersonas,
+262:           organizador:      dto.organizador,
+263:           fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`),
+264:           fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`),
+265:           horaDesde:        dto.horaDesde,
+266:           horaHasta:        dto.horaHasta,
+267:           edadMin:          dto.edadMin,
+268:           edadMax:          dto.edadMax,
+269:           anexos:           dto.anexos ?? [],
+270:           areas: { create: dto.areaIds.map((areaId) => ({ areaId })) },
+271:         },
+272:         include: { areas: { include: { area: true } } },
+273:       });
+274: 
+275:       await tx.area.updateMany({
+276:         where: { id: { in: dto.areaIds } },
+277:         data:  { estado: AreaStatus.OCUPADO },
+278:       });
+279: 
+280:       return nueva;
+281:     });
+282: 
+283:     return ocupacion;
+284:   }
+285: 
+286:   // ── FIND ALL ──────────────────────────────────────────────────────────────
+287:   findAll() {
+288:     return this.prisma.ocupacion.findMany({
+289:       orderBy: { fechaDesde: 'asc' },
+290:       include: { areas: { include: { area: true } } },
+291:     });
+292:   }
+293: 
+294:   // ── FIND ACTIVAS (sin liberadaAt, desde hoy) ──────────────────────────────
+295:   findActivas() {
+296:     const hoy = new Date(`${hoyArgentina()}T00:00:00.000Z`);
+297:     return this.prisma.ocupacion.findMany({
+298:       where: {
+299:         liberadaAt: null,
+300:         fechaHasta: { gte: hoy },
+301:       },
+302:       orderBy: { fechaDesde: 'asc' },
+303:       include: { areas: { include: { area: true } } },
+304:     });
+305:   }
+306: 
+307:   // ── FIND ONE ──────────────────────────────────────────────────────────────
+308:   async findOne(id: number) {
+309:     const ocupacion = await this.prisma.ocupacion.findUnique({
+310:       where: { id },
+311:       include: { areas: { include: { area: true } } },
+312:     });
+313:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
+314:     return ocupacion;
+315:   }
+316: 
+317:   // ── UPDATE ────────────────────────────────────────────────────────────────
+318:   async update(id: number, dto: UpdateOcupacionDto) {
+319:     const actual = await this.findOne(id);
+320: 
+321:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
+322:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
+323:     }
+324: 
+325:     // Si cambió el horario/fecha, verificar conflictos excluyendo esta misma ocupación
+326:     const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
+327:     const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
+328:     const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
+329:     const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
+330:     const areaIds    = dto.areaIds    ?? actual.areas.map((r) => r.areaId);
+331: 
+332:     if (dto.fechaDesde || dto.fechaHasta || dto.horaDesde || dto.horaHasta || dto.areaIds) {
+333:       await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
+334:     }
+335: 
+336:     // Si cambian las áreas, actualizar relaciones y estados
+337:     if (dto.areaIds) {
+338:       const anterioresIds = actual.areas.map((r) => r.areaId);
+339:       await this.prisma.$transaction(async (tx) => {
+340:         // Liberar áreas que ya no están
+341:         const aLiberar = anterioresIds.filter((aid) => !dto.areaIds!.includes(aid));
+342:         if (aLiberar.length > 0) {
+343:           await tx.area.updateMany({ where: { id: { in: aLiberar } }, data: { estado: AreaStatus.LIBRE } });
+344:         }
+345:         // Ocupar áreas nuevas
+346:         const aNuevas = dto.areaIds!.filter((aid) => !anterioresIds.includes(aid));
+347:         if (aNuevas.length > 0) {
+348:           await tx.area.updateMany({ where: { id: { in: aNuevas } }, data: { estado: AreaStatus.OCUPADO } });
+349:         }
+350:         // Reemplazar relaciones
+351:         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+352:         await tx.ocupacionArea.createMany({
+353:           data: dto.areaIds!.map((areaId) => ({ ocupacionId: id, areaId })),
+354:         });
+355:       });
+356:     }
+357: 
+358:     return this.prisma.ocupacion.update({
+359:       where: { id },
+360:       data: {
+361:         ...(dto.titulo           !== undefined && { titulo:           dto.titulo }),
+362:         ...(dto.requerimiento    !== undefined && { requerimiento:    dto.requerimiento }),
+363:         ...(dto.cantidadPersonas !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
+364:         ...(dto.organizador      !== undefined && { organizador:      dto.organizador }),
+365:         ...(dto.fechaDesde       !== undefined && { fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`) }),
+366:         ...(dto.fechaHasta       !== undefined && { fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`) }),
+367:         ...(dto.horaDesde        !== undefined && { horaDesde:        dto.horaDesde }),
+368:         ...(dto.horaHasta        !== undefined && { horaHasta:        dto.horaHasta }),
+369:         ...(dto.edadMin          !== undefined && { edadMin:          dto.edadMin }),
+370:         ...(dto.edadMax          !== undefined && { edadMax:          dto.edadMax }),
+371:         ...(dto.anexos           !== undefined && { anexos:           dto.anexos }),
+372:       },
+373:       include: { areas: { include: { area: true } } },
+374:     });
+375:   }
+376: 
+377:   // ── LIBERAR MANUAL ────────────────────────────────────────────────────────
+378:   async liberar(id: number) {
+379:     const ocupacion = await this.findOne(id);
+380:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
+381: 
+382:     await this.prisma.$transaction(async (tx) => {
+383:       if (areaIds.length > 0) {
+384:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+385:       }
+386:       await tx.ocupacion.update({ where: { id }, data: { liberadaAt: new Date() } });
+387:     });
+388: 
+389:     return this.findOne(id);
+390:   }
+391: 
+392:   // ── REMOVE ────────────────────────────────────────────────────────────────
+393:   async remove(id: number) {
+394:     const ocupacion = await this.findOne(id);
+395:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
+396: 
+397:     await this.prisma.$transaction(async (tx) => {
+398:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+399:       if (areaIds.length > 0) {
+400:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+401:       }
+402:       await tx.ocupacion.delete({ where: { id } });
+403:     });
+404: 
+405:     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
+406:   }
+407: 
+408:   // ── CRON: auto-liberar áreas cuando termina el evento ────────────────────
+409:   // Corre cada minuto. Libera ocupaciones donde fechaHasta+horaHasta < ahora
+410:   @Cron('* * * * *')
+411:   async autoLiberarVencidas() {
+412:     const ahora      = new Date();
+413:     const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000); // UTC-3
+414:     const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
+415:     const minutosNow = ahoraUTC3.getHours() * 60 + ahoraUTC3.getMinutes();
+416: 
+417:     try {
+418:       // Buscar ocupaciones activas cuya fechaHasta ya pasó o es hoy y horaHasta ya pasó
+419:       const candidatas = await this.prisma.ocupacion.findMany({
+420:         where: {
+421:           liberadaAt: null,
+422:           fechaHasta: { lte: new Date(`${fechaHoy}T23:59:59.000Z`) },
+423:         },
+424:         include: { areas: { include: { area: true } } },
+425:       });
+426: 
+427:       for (const oc of candidatas) {
+428:         const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
+429: 
+430:         // Si la fecha de fin ya pasó completamente
+431:         if (fechaFin < fechaHoy) {
+432:           await this.liberarInterno(oc);
+433:           continue;
+434:         }
+435: 
+436:         // Si es hoy, verificar que la hora ya pasó
+437:         if (fechaFin === fechaHoy) {
+438:           const minutosFin = timeToMinutes(oc.horaHasta);
+439:           if (minutosNow >= minutosFin) {
+440:             await this.liberarInterno(oc);
+441:           }
+442:         }
+443:       }
+444:     } catch (err) {
+445:       this.logger.error('Error en autoLiberarVencidas:', (err as Error).message);
+446:     }
+447:   }
+448: 
+449:   private async liberarInterno(oc: { id: number; areas: { areaId: number }[] }) {
+450:     const areaIds = oc.areas.map((r) => r.areaId);
+451:     await this.prisma.$transaction(async (tx) => {
+452:       if (areaIds.length > 0) {
+453:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+454:       }
+455:       await tx.ocupacion.update({ where: { id: oc.id }, data: { liberadaAt: new Date() } });
+456:     });
+457:     this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
+458:   }
+459: }
+460: EOF
+461: echo "✅  ocupacion.service.ts"
+462: 
+463: # ════════════════════════════════════════════════════════════════════════════
+464: # 5. Controller — agrega GET /activas
+465: # ════════════════════════════════════════════════════════════════════════════
+466: echo "📄  src/ocupacion/ocupacion.controller.ts..."
+467: cat > src/ocupacion/ocupacion.controller.ts << 'EOF'
+468: import {
+469:   Controller,
+470:   Get,
+471:   Post,
+472:   Patch,
+473:   Delete,
+474:   Param,
+475:   Body,
+476:   ParseIntPipe,
+477:   HttpCode,
+478:   HttpStatus,
+479:   UsePipes,
+480:   ValidationPipe,
+481: } from '@nestjs/common';
+482: import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+483: import { OcupacionService } from './ocupacion.service';
+484: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+485: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
+486: 
+487: @ApiTags('ocupaciones')
+488: @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+489: @Controller('ocupaciones')
+490: export class OcupacionController {
+491:   constructor(private readonly ocupacionService: OcupacionService) {}
+492: 
+493:   @Post()
+494:   @HttpCode(HttpStatus.CREATED)
+495:   @ApiOperation({ summary: 'Crear ocupación — valida conflictos de horario y marca áreas OCUPADO' })
+496:   @ApiResponse({ status: 201, description: 'Ocupación creada' })
+497:   @ApiResponse({ status: 400, description: 'Datos inválidos o conflicto de horario' })
+498:   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
+499:   create(@Body() dto: CreateOcupacionDto) {
+500:     return this.ocupacionService.create(dto);
+501:   }
+502: 
+503:   @Get()
+504:   @ApiOperation({ summary: 'Listar todas las ocupaciones' })
+505:   findAll() {
+506:     return this.ocupacionService.findAll();
+507:   }
+508: 
+509:   @Get('activas')
+510:   @ApiOperation({ summary: 'Listar ocupaciones activas (sin liberadaAt, desde hoy)' })
+511:   findActivas() {
+512:     return this.ocupacionService.findActivas();
+513:   }
+514: 
+515:   @Get(':id')
+516:   @ApiOperation({ summary: 'Obtener una ocupación por ID' })
+517:   @ApiResponse({ status: 404, description: 'No encontrada' })
+518:   findOne(@Param('id', ParseIntPipe) id: number) {
+519:     return this.ocupacionService.findOne(id);
+520:   }
+521: 
+522:   @Patch(':id')
+523:   @ApiOperation({ summary: 'Actualizar ocupación — revalida conflictos si cambia horario/áreas' })
+524:   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOcupacionDto) {
+525:     return this.ocupacionService.update(id, dto);
+526:   }
+527: 
+528:   @Patch(':id/liberar')
+529:   @ApiOperation({ summary: 'Liberar ocupación manualmente → áreas vuelven a LIBRE' })
+530:   liberar(@Param('id', ParseIntPipe) id: number) {
+531:     return this.ocupacionService.liberar(id);
+532:   }
+533: 
+534:   @Delete(':id')
+535:   @HttpCode(HttpStatus.NO_CONTENT)
+536:   @ApiOperation({ summary: 'Eliminar ocupación y liberar sus áreas' })
+537:   remove(@Param('id', ParseIntPipe) id: number) {
+538:     return this.ocupacionService.remove(id);
+539:   }
+540: }
+541: EOF
+542: echo "✅  ocupacion.controller.ts"
+543: 
+544: # ════════════════════════════════════════════════════════════════════════════
+545: # 6. Module — asegurar que ScheduleModule esté en AppModule
+546: # ════════════════════════════════════════════════════════════════════════════
+547: echo ""
+548: echo "📄  Verificando ScheduleModule en app.module.ts..."
+549: if ! grep -q "ScheduleModule" src/app.module.ts; then
+550:   node - << 'JSEOF'
+551: const fs  = require('fs')
+552: const path = 'src/app.module.ts'
+553: let src    = fs.readFileSync(path, 'utf8')
+554: 
+555: // Agregar import de ScheduleModule
+556: if (!src.includes('@nestjs/schedule')) {
+557:   src = `import { ScheduleModule } from '@nestjs/schedule';\n` + src
+558: }
+559: 
+560: // Agregar ScheduleModule.forRoot() en imports
+561: src = src.replace(
+562:   /imports:\s*\[/,
+563:   `imports: [\n    ScheduleModule.forRoot(),`
+564: )
+565: 
+566: fs.writeFileSync(path, src, 'utf8')
+567: console.log('✅  ScheduleModule agregado a app.module.ts')
+568: JSEOF
+569: fi
+570: 
+571: # ════════════════════════════════════════════════════════════════════════════
+572: # 7. Instalar @nestjs/schedule si no está
+573: # ════════════════════════════════════════════════════════════════════════════
+574: echo ""
+575: echo "📦  Verificando @nestjs/schedule..."
+576: if ! grep -q '"@nestjs/schedule"' package.json; then
+577:   pnpm add @nestjs/schedule
+578:   echo "✅  @nestjs/schedule instalado"
+579: else
+580:   echo "ℹ️   @nestjs/schedule ya presente"
+581: fi
+582: 
+583: # ════════════════════════════════════════════════════════════════════════════
+584: # 8. Build
+585: # ════════════════════════════════════════════════════════════════════════════
+586: echo ""
+587: echo "🔨  Compilando..."
+588: pnpm build
+589: 
+590: echo ""
+591: echo "╔══════════════════════════════════════════════════════════════════╗"
+592: echo "║  ✅  v5-back-ocupacion-fechas.sh — v1.0.0 completado            ║"
+593: echo "╚══════════════════════════════════════════════════════════════════╝"
+594: echo ""
+595: echo "  Nuevos endpoints:"
+596: echo "    POST  /ocupaciones        → crea, valida conflicto de horario"
+597: echo "    GET   /ocupaciones/activas → solo activas desde hoy"
+598: echo "    PATCH /ocupaciones/:id/liberar"
+599: echo ""
+600: echo "  Cron cada 1 min → auto-libera áreas al terminar el evento"
+601: echo ""
+602: echo "  ⚠️  Verificá que en app.module.ts esté ScheduleModule.forRoot()"
+603: echo ""
+````
+
 ## File: src/app.module.ts
 ````typescript
- 1: import { OcupacionModule } from './ocupacion/ocupacion.module';
- 2: import { Module } from '@nestjs/common';
- 3: import { ConfigModule } from '@nestjs/config';
- 4: import { AreaModule } from './area/area.module';
- 5: import { UsuarioModule } from './usuario/usuario.module';
- 6: import { ReservaModule } from './reserva/reserva.module';
- 7: import { PrismaModule } from 'prisma/prisma.module';
- 8: import { AuthModule } from './auth/auth.module';
+ 1: import { ScheduleModule } from '@nestjs/schedule';
+ 2: import { OcupacionModule } from './ocupacion/ocupacion.module';
+ 3: import { Module } from '@nestjs/common';
+ 4: import { ConfigModule } from '@nestjs/config';
+ 5: import { AreaModule } from './area/area.module';
+ 6: import { UsuarioModule } from './usuario/usuario.module';
+ 7: import { ReservaModule } from './reserva/reserva.module';
+ 8: import { PrismaModule } from 'prisma/prisma.module';
+ 9: import { AuthModule } from './auth/auth.module';
+10: 
+11: @Module({
+12:   imports: [
+13:     ScheduleModule.forRoot(),
+14:     ConfigModule.forRoot({
+15:       isGlobal: true,
+16:     }),
+17:     PrismaModule,
+18:     AreaModule,
+19:     UsuarioModule,
+20:     ReservaModule,
+21:     AuthModule,
+22:     OcupacionModule,
+23:   ],
+24: })
+25: export class AppModule {}
+````
+
+## File: Dockerfile
+````dockerfile
+ 1: FROM node:22-alpine AS builder
+ 2: WORKDIR /app
+ 3: 
+ 4: RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
+ 5: RUN echo "node-linker=hoisted" > .npmrc
+ 6: 
+ 7: COPY package.json pnpm-lock.yaml ./
+ 8: RUN pnpm install --no-frozen-lockfile --ignore-scripts
  9: 
-10: @Module({
-11:   imports: [
-12:     ConfigModule.forRoot({
-13:       isGlobal: true,
-14:     }),
-15:     PrismaModule,
-16:     AreaModule,
-17:     UsuarioModule,
-18:     ReservaModule,
-19:     AuthModule,
-20:     OcupacionModule,
-21:   ],
-22: })
-23: export class AppModule {}
+10: COPY prisma ./prisma
+11: COPY prisma.config.ts ./
+12: 
+13: ARG DATABASE_URL
+14: ENV DATABASE_URL=$DATABASE_URL
+15: 
+16: RUN npx prisma generate
+17: 
+18: COPY . .
+19: RUN pnpm build
+20: 
+21: FROM node:22-alpine AS runner
+22: WORKDIR /app
+23: ENV NODE_ENV=production
+24: 
+25: RUN apk add --no-cache openssl
+26: 
+27: COPY --from=builder /app/node_modules ./node_modules
+28: COPY --from=builder /app/dist ./dist
+29: COPY --from=builder /app/prisma ./prisma
+30: COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+31: COPY --from=builder /app/package.json ./package.json
+32: 
+33: EXPOSE 3550
+34: 
+35: CMD ["node", "dist/src/main.js"]
+````
+
+## File: .github/workflows/deploy.yml
+````yaml
+ 1: name: CI/CD
+ 2: 
+ 3: on:
+ 4:   push:
+ 5:     branches: [main]
+ 6: 
+ 7: jobs:
+ 8:   build-and-deploy:
+ 9:     runs-on: ubuntu-latest
+10: 
+11:     steps:
+12:       - name: Checkout código
+13:         uses: actions/checkout@v4
+14: 
+15:       - name: Login a GitHub Container Registry
+16:         uses: docker/login-action@v3
+17:         with:
+18:           registry: ghcr.io
+19:           username: ${{ github.actor }}
+20:           password: ${{ secrets.GITHUB_TOKEN }}
+21: 
+22:       - name: Build y push imagen
+23:         uses: docker/build-push-action@v5
+24:         with:
+25:           context: .
+26:           push: true
+27:           tags: ghcr.io/${{ github.repository }}:latest
+28:           build-args: |
+29:             DATABASE_URL=${{ secrets.DATABASE_URL }}
+30: 
+31:       - name: Deploy en Droplet
+32:         uses: appleboy/ssh-action@v1
+33:         with:
+34:           host: ${{ secrets.DO_HOST }}
+35:           username: ${{ secrets.DO_USER }}
+36:           key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+37:           port: ${{ secrets.DO_PORT }}
+38:           script: |
+39:             docker login ghcr.io -u ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
+40:             docker pull ghcr.io/${{ github.repository }}:latest
+41:             docker stop coworking-back || true
+42:             docker rm coworking-back || true
+43:             docker run --rm \
+44:               --network red_interna \
+45:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+46:               ghcr.io/${{ github.repository }}:latest \
+47:               npx prisma migrate deploy
+48:             docker run -d \
+49:               --name coworking-back \
+50:               --restart always \
+51:               --network red_interna \
+52:               -p 3550:3550 \
+53:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+54:               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
+55:               -e PORT="${{ secrets.PORT }}" \
+56:               ghcr.io/${{ github.repository }}:latest
 ````
 
 ## File: prisma/schema.prisma
@@ -2600,64 +2886,29 @@ x.sh
 70:   requerimiento    String
 71:   cantidadPersonas Int
 72:   organizador      String
-73:   dia              String
-74:   hora             String
-75:   edadMin          Int?
-76:   edadMax          Int?
-77:   anexos           String[]
-78:   liberadaAt       DateTime?
-79:   areas            OcupacionArea[]
-80:   createdAt        DateTime        @default(now())
-81:   updatedAt        DateTime        @updatedAt
-82: }
-83: 
-84: model OcupacionArea {
-85:   ocupacionId Int
-86:   areaId      Int
-87:   ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
-88:   area        Area      @relation(fields: [areaId], references: [id])
-89: 
-90:   @@id([ocupacionId, areaId])
-91: }
-````
-
-## File: Dockerfile
-````dockerfile
- 1: FROM node:22-alpine AS builder
- 2: WORKDIR /app
- 3: 
- 4: RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
- 5: RUN echo "node-linker=hoisted" > .npmrc
- 6: 
- 7: COPY package.json pnpm-lock.yaml ./
- 8: RUN pnpm install --no-frozen-lockfile --ignore-scripts
- 9: 
-10: COPY prisma ./prisma
-11: COPY prisma.config.ts ./
-12: 
-13: ARG DATABASE_URL
-14: ENV DATABASE_URL=$DATABASE_URL
-15: 
-16: RUN npx prisma generate
-17: 
-18: COPY . .
-19: RUN pnpm build
-20: 
-21: FROM node:22-alpine AS runner
-22: WORKDIR /app
-23: ENV NODE_ENV=production
-24: 
-25: RUN apk add --no-cache openssl
-26: 
-27: COPY --from=builder /app/node_modules ./node_modules
-28: COPY --from=builder /app/dist ./dist
-29: COPY --from=builder /app/prisma ./prisma
-30: COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-31: COPY --from=builder /app/package.json ./package.json
-32: 
-33: EXPOSE 3550
-34: 
-35: CMD ["node", "dist/src/main.js"]
+73:   // ── Reemplaza dia: String + hora: String ──
+74:   fechaDesde       DateTime
+75:   fechaHasta       DateTime
+76:   horaDesde        String
+77:   horaHasta        String
+78:   // ─────────────────────────────────────────
+79:   edadMin          Int?
+80:   edadMax          Int?
+81:   anexos           String[]
+82:   liberadaAt       DateTime?
+83:   areas            OcupacionArea[]
+84:   createdAt        DateTime        @default(now())
+85:   updatedAt        DateTime        @updatedAt
+86: }
+87: 
+88: model OcupacionArea {
+89:   ocupacionId Int
+90:   areaId      Int
+91:   ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
+92:   area        Area      @relation(fields: [areaId], references: [id])
+93: 
+94:   @@id([ocupacionId, areaId])
+95: }
 ````
 
 ## File: package.json
@@ -2689,210 +2940,151 @@ x.sh
  25:     "@nestjs/config": "^4.0.2",
  26:     "@nestjs/core": "^11.0.1",
  27:     "@nestjs/platform-express": "^11.0.1",
- 28:     "@nestjs/swagger": "^11.2.1",
- 29:     "@prisma/adapter-pg": "^7.1.0",
- 30:     "@prisma/client": "^7.1.0",
- 31:     "class-transformer": "^0.5.1",
- 32:     "class-validator": "^0.14.3",
- 33:     "dotenv": "^17.2.3",
- 34:     "pg": "^8.16.3",
- 35:     "reflect-metadata": "^0.2.2",
- 36:     "rxjs": "^7.8.1"
- 37:   },
- 38:   "devDependencies": {
- 39:     "@eslint/eslintrc": "^3.2.0",
- 40:     "@eslint/js": "^9.18.0",
- 41:     "@nestjs/cli": "^11.0.0",
- 42:     "@nestjs/schematics": "^11.0.0",
- 43:     "@nestjs/testing": "^11.0.1",
- 44:     "@types/express": "^5.0.0",
- 45:     "@types/jest": "^30.0.0",
- 46:     "@types/node": "^22.10.7",
- 47:     "@types/supertest": "^6.0.2",
- 48:     "eslint": "^9.18.0",
- 49:     "eslint-config-prettier": "^10.0.1",
- 50:     "eslint-plugin-prettier": "^5.2.2",
- 51:     "globals": "^16.0.0",
- 52:     "jest": "^30.0.0",
- 53:     "prettier": "^3.4.2",
- 54:     "prisma": "^7.1.0",
- 55:     "source-map-support": "^0.5.21",
- 56:     "supertest": "^7.0.0",
- 57:     "ts-jest": "^29.2.5",
- 58:     "ts-loader": "^9.5.2",
- 59:     "ts-node": "^10.9.2",
- 60:     "tsconfig-paths": "^4.2.0",
- 61:     "typescript": "^5.7.3",
- 62:     "typescript-eslint": "^8.20.0"
- 63:   },
- 64:   "jest": {
- 65:     "moduleFileExtensions": [
- 66:       "js",
- 67:       "json",
- 68:       "ts"
- 69:     ],
- 70:     "rootDir": "src",
- 71:     "testRegex": ".*\\.spec\\.ts$",
- 72:     "transform": {
- 73:       "^.+\\.(t|j)s$": "ts-jest"
- 74:     },
- 75:     "collectCoverageFrom": [
- 76:       "**/*.(t|j)s"
- 77:     ],
- 78:     "coverageDirectory": "../coverage",
- 79:     "testEnvironment": "node"
- 80:   },
- 81:   "pnpm": {
- 82:     "overrides": {
- 83:       "hono@<4.11.4": ">=4.11.4",
- 84:       "hono@<4.11.7": ">=4.11.7",
- 85:       "diff@>=4.0.0 <4.0.4": ">=4.0.4",
- 86:       "@isaacs/brace-expansion@<=5.0.0": ">=5.0.1",
- 87:       "webpack@>=5.49.0 <=5.104.0": ">=5.104.1",
- 88:       "webpack@>=5.49.0 <5.104.0": ">=5.104.0",
- 89:       "qs@>=6.7.0 <=6.14.1": ">=6.14.2",
- 90:       "hono@<4.11.10": ">=4.11.10",
- 91:       "minimatch@<3.1.3": ">=3.1.3",
- 92:       "minimatch@>=9.0.0 <9.0.6": ">=9.0.6",
- 93:       "minimatch@>=10.0.0 <10.2.1": ">=10.2.1",
- 94:       "minimatch@>=9.0.0 <9.0.7": ">=9.0.7",
- 95:       "minimatch@>=10.0.0 <10.2.3": ">=10.2.3",
- 96:       "minimatch@<3.1.4": ">=3.1.4",
- 97:       "multer@<2.1.0": ">=2.1.0",
- 98:       "serialize-javascript@<=7.0.2": ">=7.0.3",
- 99:       "ajv@<6.14.0": ">=6.14.0",
-100:       "ajv@>=7.0.0-alpha.0 <8.18.0": ">=8.18.0",
-101:       "qs@<6.14.1": ">=6.14.1",
-102:       "multer@<2.1.1": ">=2.1.1",
-103:       "hono@<4.12.4": ">=4.12.4",
-104:       "@hono/node-server@<1.19.10": ">=1.19.10",
-105:       "file-type@>=13.0.0 <21.3.1": ">=21.3.1",
-106:       "hono@<4.12.7": ">=4.12.7",
-107:       "flatted@<3.4.0": ">=3.4.0",
-108:       "file-type@>=20.0.0 <=21.3.1": ">=21.3.2",
-109:       "effect@<3.20.0": ">=3.20.0",
-110:       "flatted@<=3.4.1": ">=3.4.2",
-111:       "handlebars@>=4.0.0 <=4.7.8": ">=4.7.9",
-112:       "brace-expansion@<1.1.13": ">=1.1.13",
-113:       "brace-expansion@>=2.0.0 <2.0.3": ">=2.0.3",
-114:       "handlebars@>=4.0.0 <4.7.9": ">=4.7.9",
-115:       "picomatch@<2.3.2": ">=2.3.2",
-116:       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4",
-117:       "path-to-regexp@>=8.0.0 <8.4.0": ">=8.4.0",
-118:       "handlebars@>=4.6.0 <=4.7.8": ">=4.7.9",
-119:       "lodash@>=4.0.0 <=4.17.23": ">=4.18.0",
-120:       "lodash@<=4.17.23": ">=4.18.0",
-121:       "defu@<=6.1.4": ">=6.1.5",
-122:       "hono@<4.12.12": ">=4.12.12",
-123:       "hono@>=4.0.0 <=4.12.11": ">=4.12.12",
-124:       "@hono/node-server@<1.19.13": ">=1.19.13",
-125:       "@nestjs/core@<=11.1.17": ">=11.1.18",
-126:       "hono@<4.12.18": ">=4.12.18",
-127:       "hono@<4.12.16": ">=4.12.16",
-128:       "serialize-javascript@>=5.0.0 <7.0.5": ">=7.0.5",
-129:       "qs@>=6.11.1 <=6.15.1": ">=6.15.2",
-130:       "hono@<4.12.21": ">=4.12.21",
-131:       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23",
-132:       "form-data@>=4.0.0 <4.0.6": ">=4.0.6",
-133:       "multer@>=1.0.0 <2.2.0": ">=2.2.0",
-134:       "multer@>=2.0.0-alpha.1 <2.2.0": ">=2.2.0",
-135:       "hono@<4.12.14": ">=4.12.14",
-136:       "js-yaml@<3.15.0": ">=3.15.0",
-137:       "js-yaml@>=4.0.0 <=4.1.1": ">=4.2.0",
-138:       "@babel/core@<=7.29.0": ">=7.29.6",
-139:       "brace-expansion@>=2.0.0 <2.1.2": ">=2.1.2",
-140:       "brace-expansion@<1.1.16": ">=1.1.16",
-141:       "js-yaml@>=4.0.0 <4.3.0": ">=4.3.0",
-142:       "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0",
-143:       "body-parser@>=2.0.0 <2.3.0": ">=2.3.0",
-144:       "hono@<4.12.25": ">=4.12.25",
-145:       "hono@>=4.3.3 <4.12.27": ">=4.12.27",
-146:       "@hono/node-server@<2.0.5": ">=2.0.5",
-147:       "hono@>=4.0.0 <4.12.27": ">=4.12.27",
-148:       "fast-uri@>=3.0.0 <=3.1.3": ">=3.1.4",
-149:       "valibot@<=1.4.1": ">=1.4.2",
-150:       "brace-expansion@<1.1.17": ">=1.1.17",
-151:       "brace-expansion@>=2.0.0 <2.1.3": ">=2.1.3",
-152:       "fast-uri@>=3.0.0 <3.1.5": ">=3.1.5",
-153:       "hono@<4.12.34": ">=4.12.34",
-154:       "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4",
-155:       "brace-expansion@<1.1.18": ">=1.1.18",
-156:       "js-yaml@>=3.0.0 <3.15.1": ">=3.15.1",
-157:       "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1",
-158:       "fast-uri@>=3.0.0 <3.1.3": ">=3.1.3",
-159:       "hono@>=3.8.0 <4.12.34": ">=4.12.34",
-160:       "hono@>=4.7.0 <4.12.34": ">=4.12.34",
-161:       "fast-uri@>=3.0.0 <=3.1.0": ">=3.1.1",
-162:       "fast-uri@>=3.0.0 <=3.1.1": ">=3.1.2"
-163:     },
-164:     "onlyBuiltDependencies": [
-165:       "@prisma/engines",
-166:       "@scarf/scarf",
-167:       "prisma",
-168:       "unrs-resolver"
-169:     ]
-170:   }
-171: }
-````
-
-## File: .github/workflows/deploy.yml
-````yaml
- 1: name: CI/CD
- 2: 
- 3: on:
- 4:   push:
- 5:     branches: [main]
- 6: 
- 7: jobs:
- 8:   build-and-deploy:
- 9:     runs-on: ubuntu-latest
-10: 
-11:     steps:
-12:       - name: Checkout código
-13:         uses: actions/checkout@v4
-14: 
-15:       - name: Login a GitHub Container Registry
-16:         uses: docker/login-action@v3
-17:         with:
-18:           registry: ghcr.io
-19:           username: ${{ github.actor }}
-20:           password: ${{ secrets.GITHUB_TOKEN }}
-21: 
-22:       - name: Build y push imagen
-23:         uses: docker/build-push-action@v5
-24:         with:
-25:           context: .
-26:           push: true
-27:           tags: ghcr.io/${{ github.repository }}:latest
-28:           build-args: |
-29:             DATABASE_URL=${{ secrets.DATABASE_URL }}
-30: 
-31:       - name: Deploy en Droplet
-32:         uses: appleboy/ssh-action@v1
-33:         with:
-34:           host: ${{ secrets.DO_HOST }}
-35:           username: ${{ secrets.DO_USER }}
-36:           key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
-37:           port: ${{ secrets.DO_PORT }}
-38:           script: |
-39:             docker login ghcr.io -u ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }}
-40:             docker pull ghcr.io/${{ github.repository }}:latest
-41:             docker stop coworking-back || true
-42:             docker rm coworking-back || true
-43:             docker run --rm \
-44:               --network red_interna \
-45:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-46:               ghcr.io/${{ github.repository }}:latest \
-47:               npx prisma migrate deploy
-48:             docker run -d \
-49:               --name coworking-back \
-50:               --restart always \
-51:               --network red_interna \
-52:               -p 3550:3550 \
-53:               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-54:               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
-55:               -e PORT="${{ secrets.PORT }}" \
-56:               ghcr.io/${{ github.repository }}:latest
+ 28:     "@nestjs/schedule": "^6.1.3",
+ 29:     "@nestjs/swagger": "^11.2.1",
+ 30:     "@prisma/adapter-pg": "^7.1.0",
+ 31:     "@prisma/client": "^7.1.0",
+ 32:     "class-transformer": "^0.5.1",
+ 33:     "class-validator": "^0.14.3",
+ 34:     "dotenv": "^17.2.3",
+ 35:     "pg": "^8.16.3",
+ 36:     "reflect-metadata": "^0.2.2",
+ 37:     "rxjs": "^7.8.1"
+ 38:   },
+ 39:   "devDependencies": {
+ 40:     "@eslint/eslintrc": "^3.2.0",
+ 41:     "@eslint/js": "^9.18.0",
+ 42:     "@nestjs/cli": "^11.0.0",
+ 43:     "@nestjs/schematics": "^11.0.0",
+ 44:     "@nestjs/testing": "^11.0.1",
+ 45:     "@types/express": "^5.0.0",
+ 46:     "@types/jest": "^30.0.0",
+ 47:     "@types/node": "^22.10.7",
+ 48:     "@types/supertest": "^6.0.2",
+ 49:     "eslint": "^9.18.0",
+ 50:     "eslint-config-prettier": "^10.0.1",
+ 51:     "eslint-plugin-prettier": "^5.2.2",
+ 52:     "globals": "^16.0.0",
+ 53:     "jest": "^30.0.0",
+ 54:     "prettier": "^3.4.2",
+ 55:     "prisma": "^7.1.0",
+ 56:     "source-map-support": "^0.5.21",
+ 57:     "supertest": "^7.0.0",
+ 58:     "ts-jest": "^29.2.5",
+ 59:     "ts-loader": "^9.5.2",
+ 60:     "ts-node": "^10.9.2",
+ 61:     "tsconfig-paths": "^4.2.0",
+ 62:     "typescript": "^5.7.3",
+ 63:     "typescript-eslint": "^8.20.0"
+ 64:   },
+ 65:   "jest": {
+ 66:     "moduleFileExtensions": [
+ 67:       "js",
+ 68:       "json",
+ 69:       "ts"
+ 70:     ],
+ 71:     "rootDir": "src",
+ 72:     "testRegex": ".*\\.spec\\.ts$",
+ 73:     "transform": {
+ 74:       "^.+\\.(t|j)s$": "ts-jest"
+ 75:     },
+ 76:     "collectCoverageFrom": [
+ 77:       "**/*.(t|j)s"
+ 78:     ],
+ 79:     "coverageDirectory": "../coverage",
+ 80:     "testEnvironment": "node"
+ 81:   },
+ 82:   "pnpm": {
+ 83:     "overrides": {
+ 84:       "hono@<4.11.4": ">=4.11.4",
+ 85:       "hono@<4.11.7": ">=4.11.7",
+ 86:       "diff@>=4.0.0 <4.0.4": ">=4.0.4",
+ 87:       "@isaacs/brace-expansion@<=5.0.0": ">=5.0.1",
+ 88:       "webpack@>=5.49.0 <=5.104.0": ">=5.104.1",
+ 89:       "webpack@>=5.49.0 <5.104.0": ">=5.104.0",
+ 90:       "qs@>=6.7.0 <=6.14.1": ">=6.14.2",
+ 91:       "hono@<4.11.10": ">=4.11.10",
+ 92:       "minimatch@<3.1.3": ">=3.1.3",
+ 93:       "minimatch@>=9.0.0 <9.0.6": ">=9.0.6",
+ 94:       "minimatch@>=10.0.0 <10.2.1": ">=10.2.1",
+ 95:       "minimatch@>=9.0.0 <9.0.7": ">=9.0.7",
+ 96:       "minimatch@>=10.0.0 <10.2.3": ">=10.2.3",
+ 97:       "minimatch@<3.1.4": ">=3.1.4",
+ 98:       "multer@<2.1.0": ">=2.1.0",
+ 99:       "serialize-javascript@<=7.0.2": ">=7.0.3",
+100:       "ajv@<6.14.0": ">=6.14.0",
+101:       "ajv@>=7.0.0-alpha.0 <8.18.0": ">=8.18.0",
+102:       "qs@<6.14.1": ">=6.14.1",
+103:       "multer@<2.1.1": ">=2.1.1",
+104:       "hono@<4.12.4": ">=4.12.4",
+105:       "@hono/node-server@<1.19.10": ">=1.19.10",
+106:       "file-type@>=13.0.0 <21.3.1": ">=21.3.1",
+107:       "hono@<4.12.7": ">=4.12.7",
+108:       "flatted@<3.4.0": ">=3.4.0",
+109:       "file-type@>=20.0.0 <=21.3.1": ">=21.3.2",
+110:       "effect@<3.20.0": ">=3.20.0",
+111:       "flatted@<=3.4.1": ">=3.4.2",
+112:       "handlebars@>=4.0.0 <=4.7.8": ">=4.7.9",
+113:       "brace-expansion@<1.1.13": ">=1.1.13",
+114:       "brace-expansion@>=2.0.0 <2.0.3": ">=2.0.3",
+115:       "handlebars@>=4.0.0 <4.7.9": ">=4.7.9",
+116:       "picomatch@<2.3.2": ">=2.3.2",
+117:       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4",
+118:       "path-to-regexp@>=8.0.0 <8.4.0": ">=8.4.0",
+119:       "handlebars@>=4.6.0 <=4.7.8": ">=4.7.9",
+120:       "lodash@>=4.0.0 <=4.17.23": ">=4.18.0",
+121:       "lodash@<=4.17.23": ">=4.18.0",
+122:       "defu@<=6.1.4": ">=6.1.5",
+123:       "hono@<4.12.12": ">=4.12.12",
+124:       "hono@>=4.0.0 <=4.12.11": ">=4.12.12",
+125:       "@hono/node-server@<1.19.13": ">=1.19.13",
+126:       "@nestjs/core@<=11.1.17": ">=11.1.18",
+127:       "hono@<4.12.18": ">=4.12.18",
+128:       "hono@<4.12.16": ">=4.12.16",
+129:       "serialize-javascript@>=5.0.0 <7.0.5": ">=7.0.5",
+130:       "qs@>=6.11.1 <=6.15.1": ">=6.15.2",
+131:       "hono@<4.12.21": ">=4.12.21",
+132:       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23",
+133:       "form-data@>=4.0.0 <4.0.6": ">=4.0.6",
+134:       "multer@>=1.0.0 <2.2.0": ">=2.2.0",
+135:       "multer@>=2.0.0-alpha.1 <2.2.0": ">=2.2.0",
+136:       "hono@<4.12.14": ">=4.12.14",
+137:       "js-yaml@<3.15.0": ">=3.15.0",
+138:       "js-yaml@>=4.0.0 <=4.1.1": ">=4.2.0",
+139:       "@babel/core@<=7.29.0": ">=7.29.6",
+140:       "brace-expansion@>=2.0.0 <2.1.2": ">=2.1.2",
+141:       "brace-expansion@<1.1.16": ">=1.1.16",
+142:       "js-yaml@>=4.0.0 <4.3.0": ">=4.3.0",
+143:       "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0",
+144:       "body-parser@>=2.0.0 <2.3.0": ">=2.3.0",
+145:       "hono@<4.12.25": ">=4.12.25",
+146:       "hono@>=4.3.3 <4.12.27": ">=4.12.27",
+147:       "@hono/node-server@<2.0.5": ">=2.0.5",
+148:       "hono@>=4.0.0 <4.12.27": ">=4.12.27",
+149:       "fast-uri@>=3.0.0 <=3.1.3": ">=3.1.4",
+150:       "valibot@<=1.4.1": ">=1.4.2",
+151:       "brace-expansion@<1.1.17": ">=1.1.17",
+152:       "brace-expansion@>=2.0.0 <2.1.3": ">=2.1.3",
+153:       "fast-uri@>=3.0.0 <3.1.5": ">=3.1.5",
+154:       "hono@<4.12.34": ">=4.12.34",
+155:       "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4",
+156:       "brace-expansion@<1.1.18": ">=1.1.18",
+157:       "js-yaml@>=3.0.0 <3.15.1": ">=3.15.1",
+158:       "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1",
+159:       "fast-uri@>=3.0.0 <3.1.3": ">=3.1.3",
+160:       "hono@>=3.8.0 <4.12.34": ">=4.12.34",
+161:       "hono@>=4.7.0 <4.12.34": ">=4.12.34",
+162:       "fast-uri@>=3.0.0 <=3.1.0": ">=3.1.1",
+163:       "fast-uri@>=3.0.0 <=3.1.1": ">=3.1.2"
+164:     },
+165:     "onlyBuiltDependencies": [
+166:       "@prisma/engines",
+167:       "@scarf/scarf",
+168:       "prisma",
+169:       "unrs-resolver"
+170:     ]
+171:   }
+172: }
 ````
 
 ## File: src/main.ts
@@ -2926,7 +3118,7 @@ x.sh
 27: 
 28:   const port = process.env.PORT || 3550;
 29:   await app.listen(port);
-30: 
+30:   //hola
 31:   console.log(`🚀 Server running on http://localhost:${port}`);
 32:   console.log(`📚 Swagger docs available at http://localhost:${port}/api`);
 33: }

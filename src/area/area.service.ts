@@ -44,4 +44,31 @@ export class AreaService {
       data: { estado }
     });
   }
+
+  // ── Bloquea/libera TODAS las áreas de una vez ───────────────────────────
+  // Usado por el admin (bloqueo manual por evento) y por calendario-back
+  // (sincronización automática cuando un Evento con área COWORKING
+  // entra/sale de EN_CURSO).
+  async bloquearTodas(estado: AreaStatus) {
+    if (estado === AreaStatus.OCUPADO) {
+      await this.prisma.area.updateMany({
+        data: { estado: AreaStatus.OCUPADO },
+      });
+    } else {
+      // Al liberar, no tocar las áreas que tengan una reserva de persona
+      // activa (fin: null) — evita pisar una reserva real en curso.
+      const reservasActivas = await this.prisma.reserva.findMany({
+        where: { fin: null },
+        select: { areaId: true },
+      });
+      const idsOcupados = reservasActivas.map((r) => r.areaId);
+
+      await this.prisma.area.updateMany({
+        where: { id: { notIn: idsOcupados } },
+        data: { estado: AreaStatus.LIBRE },
+      });
+    }
+
+    return this.prisma.area.findMany();
+  }
 }
