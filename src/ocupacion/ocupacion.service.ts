@@ -239,7 +239,7 @@ export class OcupacionService {
   }
 
   // ── AUTO-LIBERAR (cron cada minuto) ───────────────────────────────────────
-  @Cron('* * * * *')
+  @Cron('*/5 * * * *')
   async autoLiberarVencidas() {
     const ahora      = new Date();
     // UTC-3 inmutable

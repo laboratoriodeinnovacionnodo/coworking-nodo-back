@@ -1,36 +1,45 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-// Importa el adaptador de PostgreSQL
 import { PrismaPg } from '@prisma/adapter-pg';
-// Importa el driver pg (node-postgres)
 import * as pg from 'pg';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
+  private readonly pool: pg.Pool;
 
   constructor() {
-    // Asegúrate de que DATABASE_URL esté disponible en tu archivo .env
     const connectionString = process.env.DATABASE_URL;
 
-    // Crea una instancia del Pool de conexión del driver
-    const pool = new pg.Pool({ connectionString });
+    // Pool con límite explícito — evita saturar PostgreSQL
+    const pool = new pg.Pool({
+      connectionString,
+      max:                    10,   // máximo 10 conexiones simultáneas
+      idleTimeoutMillis:   30_000, // libera conexiones inactivas a los 30s
+      connectionTimeoutMillis: 5_000, // error si no consigue conexión en 5s
+    });
 
-    // Crea una instancia del adaptador de Prisma
+    pool.on('error', (err) => {
+      // Log del error pero sin crashear la app
+      console.error('[PrismaService] Pool error:', err.message);
+    });
+
     const adapter = new PrismaPg(pool);
 
-    // Pasa el adaptador al constructor de PrismaClient
-    super({
-      adapter: adapter,
-      // Puedes añadir tus logs aquí si es necesario:
-      // log: ['query', 'error', 'warn'],
-    });
+    super({ adapter });
+
+    // Guardar referencia para destruir el pool al apagar
+    this.pool = pool;
   }
 
   async onModuleInit() {
     await this.$connect();
+    this.logger.log('Prisma conectado (pool max=10)');
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
+    await this.pool.end();
+    this.logger.log('Prisma desconectado');
   }
 }
