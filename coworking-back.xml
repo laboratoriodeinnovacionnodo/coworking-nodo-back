@@ -235,55 +235,6 @@ x.sh
 20: });
 ````
 
-## File: src/area/area.controller.ts
-````typescript
- 1: import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
- 2: import { AreaService } from './area.service';
- 3: import { CreateAreaDto } from './dto/create-area.dto';
- 4: import { UpdateAreaDto } from './dto/update-area.dto';
- 5: import { ApiTags } from '@nestjs/swagger';
- 6: import { AreaStatus } from '@prisma/client';
- 7: 
- 8: @ApiTags('areas')
- 9: @Controller('areas')
-10: export class AreaController {
-11:   constructor(private readonly areaService: AreaService) {}
-12: 
-13:   @Post()
-14:   create(@Body() dto: CreateAreaDto) {
-15:     return this.areaService.create(dto);
-16:   }
-17: 
-18:   @Get()
-19:   findAll() {
-20:     return this.areaService.findAll();
-21:   }
-22: 
-23:   @Get(':id')
-24:   findOne(@Param('id') id: string) {
-25:     return this.areaService.findOne(+id);
-26:   }
-27: 
-28:   @Patch(':id')
-29:   update(@Param('id') id: string, @Body() dto: UpdateAreaDto) {
-30:     return this.areaService.update(+id, dto);
-31:   }
-32: 
-33:   @Patch(':id/estado/:estado')
-34:   cambiarEstado(
-35:     @Param('id') id: string,
-36:     @Param('estado') estado: AreaStatus
-37:   ) {
-38:     return this.areaService.cambiarEstado(+id, estado);
-39:   }
-40: 
-41:   @Delete(':id')
-42:   remove(@Param('id') id: string) {
-43:     return this.areaService.remove(+id);
-44:   }
-45: }
-````
-
 ## File: src/area/area.module.ts
 ````typescript
  1: import { Module } from '@nestjs/common';
@@ -747,84 +698,6 @@ x.sh
 16:     expect(service).toBeDefined();
 17:   });
 18: });
-````
-
-## File: src/reserva/reserva.service.ts
-````typescript
- 1: import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
- 2: import { CreateReservaDto } from './dto/create-reserva.dto';
- 3: import { UpdateReservaDto } from './dto/update-reserva.dto';
- 4: import { PrismaService } from 'prisma/prisma.service';
- 5: import { AreaStatus } from '@prisma/client';
- 6: 
- 7: @Injectable()
- 8: export class ReservaService {
- 9:   constructor(private prisma: PrismaService) {}
-10: 
-11:   async create(data: CreateReservaDto) {
-12:     const area = await this.prisma.area.findUnique({
-13:       where: { id: data.areaId },
-14:     });
-15: 
-16:     if (!area) throw new NotFoundException('Área no encontrada');
-17:     if (area.estado !== AreaStatus.LIBRE)
-18:       throw new BadRequestException('El área no está disponible');
-19: 
-20:     // Crear la reserva
-21:     const reserva = await this.prisma.reserva.create({ data });
-22: 
-23:     // Cambiar estado del área a OCUPADO
-24:     await this.prisma.area.update({
-25:       where: { id: data.areaId },
-26:       data: { estado: AreaStatus.OCUPADO },
-27:     });
-28: 
-29:     return reserva;
-30:   }
-31: 
-32:   findAll() {
-33:     return this.prisma.reserva.findMany({
-34:       include: { usuario: true, area: true },
-35:     });
-36:   }
-37: 
-38:   findOne(id: number) {
-39:     return this.prisma.reserva.findUnique({
-40:       where: { id },
-41:       include: { usuario: true, area: true },
-42:     });
-43:   }
-44: 
-45:   update(id: number, data: UpdateReservaDto) {
-46:     return this.prisma.reserva.update({
-47:       where: { id },
-48:       data,
-49:     });
-50:   }
-51: 
-52:   async completarReserva(id: number) {
-53:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
-54:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
-55: 
-56:     // Finalizar reserva
-57:     const finalizada = await this.prisma.reserva.update({
-58:       where: { id },
-59:       data: { fin: new Date() },
-60:     });
-61: 
-62:     // Restaurar área a "LIBRE"
-63:     await this.prisma.area.update({
-64:       where: { id: reserva.areaId },
-65:       data: { estado: AreaStatus.LIBRE },
-66:     });
-67: 
-68:     return finalizada;
-69:   }
-70: 
-71:   remove(id: number) {
-72:     return this.prisma.reserva.delete({ where: { id } });
-73:   }
-74: }
 ````
 
 ## File: src/usuario/dto/create-usuario.dto.ts
@@ -1437,55 +1310,59 @@ x.sh
 4: }
 ````
 
-## File: src/area/area.service.ts
+## File: src/area/area.controller.ts
 ````typescript
- 1: import { Injectable } from '@nestjs/common';
- 2: import { CreateAreaDto } from './dto/create-area.dto';
- 3: import { UpdateAreaDto } from './dto/update-area.dto';
- 4: import { PrismaService } from 'prisma/prisma.service';
- 5: import { AreaStatus } from '@prisma/client';
- 6: 
- 7: @Injectable()
- 8: export class AreaService {
- 9:   constructor(private prisma: PrismaService) {}
-10: 
-11:   create(data: CreateAreaDto) {
-12:     return this.prisma.area.create({ data });
-13:   }
-14: 
-15:   findAll() {
-16:     return this.prisma.area.findMany();
-17:   }
-18: 
-19:   findOne(id: number) {
-20:     return this.prisma.area.findUnique({ where: { id } });
+ 1: import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+ 2: import { AreaService } from './area.service';
+ 3: import { CreateAreaDto } from './dto/create-area.dto';
+ 4: import { UpdateAreaDto } from './dto/update-area.dto';
+ 5: import { ApiTags } from '@nestjs/swagger';
+ 6: import { AreaStatus } from '@prisma/client';
+ 7: 
+ 8: @ApiTags('areas')
+ 9: @Controller('areas')
+10: export class AreaController {
+11:   constructor(private readonly areaService: AreaService) {}
+12: 
+13:   @Post()
+14:   create(@Body() dto: CreateAreaDto) {
+15:     return this.areaService.create(dto);
+16:   }
+17: 
+18:   @Get()
+19:   findAll() {
+20:     return this.areaService.findAll();
 21:   }
 22: 
-23:   update(id: number, data: UpdateAreaDto) {
-24:     return this.prisma.area.update({
-25:       where: { id },
-26:       data
-27:     });
-28:   }
-29: 
-30:   async remove(id: number) {
-31:     await this.prisma.reserva.deleteMany({
-32:       where: { areaId: id },
-33:     });
-34: 
-35:     return this.prisma.area.delete({
-36:       where: { id },
-37:     });
-38:   }
-39: 
-40:   // Cambiar estado del área
-41:   cambiarEstado(id: number, estado: AreaStatus) {
-42:     return this.prisma.area.update({
-43:       where: { id },
-44:       data: { estado }
-45:     });
-46:   }
-47: }
+23:   // Bulk: PATCH /areas/bloquear-todas/OCUPADO | LIBRE
+24:   @Patch('bloquear-todas/:estado')
+25:   bloquearTodas(@Param('estado') estado: AreaStatus) {
+26:     return this.areaService.bloquearTodas(estado);
+27:   }
+28: 
+29:   @Get(':id')
+30:   findOne(@Param('id') id: string) {
+31:     return this.areaService.findOne(+id);
+32:   }
+33: 
+34:   @Patch(':id')
+35:   update(@Param('id') id: string, @Body() dto: UpdateAreaDto) {
+36:     return this.areaService.update(+id, dto);
+37:   }
+38: 
+39:   @Patch(':id/estado/:estado')
+40:   cambiarEstado(
+41:     @Param('id') id: string,
+42:     @Param('estado') estado: AreaStatus
+43:   ) {
+44:     return this.areaService.cambiarEstado(+id, estado);
+45:   }
+46: 
+47:   @Delete(':id')
+48:   remove(@Param('id') id: string) {
+49:     return this.areaService.remove(+id);
+50:   }
+51: }
 ````
 
 ## File: src/ocupacion/dto/create-ocupacion.dto.ts
@@ -1981,6 +1858,142 @@ x.sh
 314: }
 ````
 
+## File: src/reserva/reserva.service.ts
+````typescript
+  1: import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+  2: import { CreateReservaDto } from './dto/create-reserva.dto';
+  3: import { UpdateReservaDto } from './dto/update-reserva.dto';
+  4: import { PrismaService } from 'prisma/prisma.service';
+  5: import { AreaStatus } from '@prisma/client';
+  6: 
+  7: // ── Helpers de tiempo (Argentina, UTC-3) ────────────────────────────────────
+  8: 
+  9: function timeToMinutes(hhmm: string): number {
+ 10:   const [h, m] = hhmm.split(':').map(Number);
+ 11:   return h * 60 + m;
+ 12: }
+ 13: 
+ 14: function hoyArgentina(): string {
+ 15:   const ahora = new Date();
+ 16:   ahora.setHours(ahora.getHours() - 3);
+ 17:   return ahora.toISOString().split('T')[0];
+ 18: }
+ 19: 
+ 20: function nowMinutesArgentina(): number {
+ 21:   const ahora = new Date();
+ 22:   ahora.setHours(ahora.getHours() - 3);
+ 23:   return ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
+ 24: }
+ 25: 
+ 26: @Injectable()
+ 27: export class ReservaService {
+ 28:   constructor(private prisma: PrismaService) {}
+ 29: 
+ 30:   // ── Verifica que no exista una Ocupación activa cubriendo hoy + hora actual ──
+ 31:   private async verificarOcupacionActiva(areaId: number): Promise<void> {
+ 32:     const hoy = hoyArgentina();
+ 33:     const nowMins = nowMinutesArgentina();
+ 34: 
+ 35:     const ocupacion = await this.prisma.ocupacion.findFirst({
+ 36:       where: {
+ 37:         liberadaAt: null,
+ 38:         areas: { some: { areaId } },
+ 39:         fechaDesde: { lte: new Date(`${hoy}T23:59:59.000Z`) },
+ 40:         fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
+ 41:       },
+ 42:     });
+ 43: 
+ 44:     if (!ocupacion) return;
+ 45: 
+ 46:     const fechaDesdeStr = ocupacion.fechaDesde.toISOString().split('T')[0];
+ 47:     const fechaHastaStr = ocupacion.fechaHasta.toISOString().split('T')[0];
+ 48: 
+ 49:     // Ocupación multi-día que ya arrancó y todavía no termina hoy → bloquea el día entero
+ 50:     if (fechaDesdeStr < hoy && fechaHastaStr > hoy) {
+ 51:       throw new BadRequestException(
+ 52:         `El área está ocupada por "${ocupacion.titulo}" hasta el ${fechaHastaStr}`,
+ 53:       );
+ 54:     }
+ 55: 
+ 56:     const desdeMin = fechaDesdeStr === hoy ? timeToMinutes(ocupacion.horaDesde) : 0;
+ 57:     const hastaMin = fechaHastaStr === hoy ? timeToMinutes(ocupacion.horaHasta) : 24 * 60;
+ 58: 
+ 59:     if (nowMins >= desdeMin && nowMins < hastaMin) {
+ 60:       throw new BadRequestException(
+ 61:         `El área está ocupada por "${ocupacion.titulo}" hoy de ${ocupacion.horaDesde} a ${ocupacion.horaHasta}`,
+ 62:       );
+ 63:     }
+ 64:   }
+ 65: 
+ 66:   async create(data: CreateReservaDto) {
+ 67:     const area = await this.prisma.area.findUnique({
+ 68:       where: { id: data.areaId },
+ 69:     });
+ 70: 
+ 71:     if (!area) throw new NotFoundException('Área no encontrada');
+ 72:     if (area.estado !== AreaStatus.LIBRE)
+ 73:       throw new BadRequestException('El área no está disponible');
+ 74: 
+ 75:     // Nuevo: valida contra Ocupaciones (día + rango horario), no solo el AreaStatus
+ 76:     await this.verificarOcupacionActiva(data.areaId);
+ 77: 
+ 78:     // Crear la reserva
+ 79:     const reserva = await this.prisma.reserva.create({ data });
+ 80: 
+ 81:     // Cambiar estado del área a OCUPADO
+ 82:     await this.prisma.area.update({
+ 83:       where: { id: data.areaId },
+ 84:       data: { estado: AreaStatus.OCUPADO },
+ 85:     });
+ 86: 
+ 87:     return reserva;
+ 88:   }
+ 89: 
+ 90:   findAll() {
+ 91:     return this.prisma.reserva.findMany({
+ 92:       include: { usuario: true, area: true },
+ 93:     });
+ 94:   }
+ 95: 
+ 96:   findOne(id: number) {
+ 97:     return this.prisma.reserva.findUnique({
+ 98:       where: { id },
+ 99:       include: { usuario: true, area: true },
+100:     });
+101:   }
+102: 
+103:   update(id: number, data: UpdateReservaDto) {
+104:     return this.prisma.reserva.update({
+105:       where: { id },
+106:       data,
+107:     });
+108:   }
+109: 
+110:   async completarReserva(id: number) {
+111:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
+112:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+113: 
+114:     // Finalizar reserva
+115:     const finalizada = await this.prisma.reserva.update({
+116:       where: { id },
+117:       data: { fin: new Date() },
+118:     });
+119: 
+120:     // Restaurar área a "LIBRE"
+121:     await this.prisma.area.update({
+122:       where: { id: reserva.areaId },
+123:       data: { estado: AreaStatus.LIBRE },
+124:     });
+125: 
+126:     return finalizada;
+127:   }
+128: 
+129:   remove(id: number) {
+130:     return this.prisma.reserva.delete({ where: { id } });
+131:   }
+132: }
+````
+
 ## File: .gitignore
 ````
  1: # compiled output
@@ -2077,611 +2090,416 @@ x.sh
 30: }
 ````
 
+## File: src/area/area.service.ts
+````typescript
+ 1: import { Injectable } from '@nestjs/common';
+ 2: import { CreateAreaDto } from './dto/create-area.dto';
+ 3: import { UpdateAreaDto } from './dto/update-area.dto';
+ 4: import { PrismaService } from 'prisma/prisma.service';
+ 5: import { AreaStatus } from '@prisma/client';
+ 6: 
+ 7: @Injectable()
+ 8: export class AreaService {
+ 9:   constructor(private prisma: PrismaService) {}
+10: 
+11:   create(data: CreateAreaDto) {
+12:     return this.prisma.area.create({ data });
+13:   }
+14: 
+15:   findAll() {
+16:     return this.prisma.area.findMany();
+17:   }
+18: 
+19:   findOne(id: number) {
+20:     return this.prisma.area.findUnique({ where: { id } });
+21:   }
+22: 
+23:   update(id: number, data: UpdateAreaDto) {
+24:     return this.prisma.area.update({
+25:       where: { id },
+26:       data
+27:     });
+28:   }
+29: 
+30:   async remove(id: number) {
+31:     await this.prisma.reserva.deleteMany({
+32:       where: { areaId: id },
+33:     });
+34: 
+35:     return this.prisma.area.delete({
+36:       where: { id },
+37:     });
+38:   }
+39: 
+40:   // Cambiar estado del área
+41:   cambiarEstado(id: number, estado: AreaStatus) {
+42:     return this.prisma.area.update({
+43:       where: { id },
+44:       data: { estado }
+45:     });
+46:   }
+47: 
+48:   // ── Bloquea/libera TODAS las áreas de una vez ───────────────────────────
+49:   // Usado por el admin (bloqueo manual por evento) y por calendario-back
+50:   // (sincronización automática cuando un Evento con área COWORKING
+51:   // entra/sale de EN_CURSO).
+52:   async bloquearTodas(estado: AreaStatus) {
+53:     if (estado === AreaStatus.OCUPADO) {
+54:       await this.prisma.area.updateMany({
+55:         data: { estado: AreaStatus.OCUPADO },
+56:       });
+57:     } else {
+58:       // Al liberar, no tocar las áreas que tengan una reserva de persona
+59:       // activa (fin: null) — evita pisar una reserva real en curso.
+60:       const reservasActivas = await this.prisma.reserva.findMany({
+61:         where: { fin: null },
+62:         select: { areaId: true },
+63:       });
+64:       const idsOcupados = reservasActivas.map((r) => r.areaId);
+65: 
+66:       await this.prisma.area.updateMany({
+67:         where: { id: { notIn: idsOcupados } },
+68:         data: { estado: AreaStatus.LIBRE },
+69:       });
+70:     }
+71: 
+72:     return this.prisma.area.findMany();
+73:   }
+74: }
+````
+
 ## File: x.sh
 ````bash
   1: #!/usr/bin/env bash
   2: # =============================================================================
-  3: # v5-back-ocupacion-fechas.sh — v1.0.0 — PRODUCCIÓN (coworking-back)
+  3: # v6-back-reserva-vs-ocupacion.sh — v1.0.0 — PRODUCCIÓN (coworking-back)
   4: #
   5: # Cambios:
-  6: #  · DTO: reemplaza dia/hora por fechaDesde/fechaHasta/horaDesde/horaHasta
-  7: #  · Service: chequeo de conflicto de horario antes de crear
-  8: #  · Service: scheduler cada 1 min — auto-libera áreas cuando termina el evento
-  9: #  · Service: nuevo endpoint GET /ocupaciones/activas (para el frontend)
- 10: #  · Controller: expone el nuevo endpoint
- 11: #
- 12: # ⚠️  SCHEMA YA MIGRADO MANUALMENTE antes de correr este script
- 13: # =============================================================================
- 14: set -euo pipefail
- 15: 
- 16: echo ""
- 17: echo "╔══════════════════════════════════════════════════════════════╗"
- 18: echo "║  v5-back-ocupacion-fechas.sh — v1.0.0                       ║"
- 19: echo "╚══════════════════════════════════════════════════════════════╝"
- 20: echo ""
- 21: 
- 22: if [ ! -f "package.json" ] || [ ! -d "src" ]; then
- 23:   echo "❌  Corré desde la raíz del proyecto NestJS"
- 24:   exit 1
- 25: fi
+  6: #  · ReservaService: NO permite crear una reserva si el área tiene una
+  7: #    Ocupación activa que cubre el día y rango horario actual.
+  8: #  · AreaService/AreaController: nuevo endpoint bulk
+  9: #      PATCH /areas/bloquear-todas/:estado
+ 10: #    - OCUPADO  -> marca TODAS las áreas ocupadas
+ 11: #    - LIBRE    -> libera todas EXCEPTO las que tengan una reserva de
+ 12: #                  persona activa (fin: null), para no pisar una reserva real
+ 13: #
+ 14: #  Este endpoint es el que usará calendario-back para sincronizar el
+ 15: #  Coworking cuando un Evento con área COWORKING está EN_CURSO / FINALIZADO.
+ 16: #
+ 17: # ⚠️  No requiere cambios de schema — no correr prisma migrate.
+ 18: # =============================================================================
+ 19: set -euo pipefail
+ 20: 
+ 21: echo ""
+ 22: echo "╔══════════════════════════════════════════════════════════════╗"
+ 23: echo "║  v6-back-reserva-vs-ocupacion.sh — v1.0.0                    ║"
+ 24: echo "╚══════════════════════════════════════════════════════════════╝"
+ 25: echo ""
  26: 
- 27: mkdir -p src/ocupacion/dto src/ocupacion/entities
- 28: 
- 29: # ════════════════════════════════════════════════════════════════════════════
- 30: # 1. DTO create
- 31: # ════════════════════════════════════════════════════════════════════════════
- 32: echo "📄  src/ocupacion/dto/create-ocupacion.dto.ts..."
- 33: cat > src/ocupacion/dto/create-ocupacion.dto.ts << 'EOF'
- 34: import {
- 35:   IsString,
- 36:   IsOptional,
- 37:   IsInt,
- 38:   IsArray,
- 39:   IsUrl,
- 40:   IsDateString,
- 41:   Matches,
- 42:   Min,
- 43:   Max,
- 44:   MinLength,
- 45:   ArrayMinSize,
- 46:   ArrayMaxSize,
- 47: } from 'class-validator';
- 48: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
- 49: import { Type } from 'class-transformer';
- 50: 
- 51: export class CreateOcupacionDto {
- 52:   @ApiProperty({ description: 'Título del evento / ocupación' })
- 53:   @IsString()
- 54:   @MinLength(3)
- 55:   titulo: string;
- 56: 
- 57:   @ApiProperty({ description: 'Requerimientos o descripción' })
- 58:   @IsString()
- 59:   @MinLength(3)
- 60:   requerimiento: string;
+ 27: if [ ! -f "package.json" ] || [ ! -d "src" ]; then
+ 28:   echo "❌  Corré desde la raíz del proyecto NestJS (coworking-back)"
+ 29:   exit 1
+ 30: fi
+ 31: 
+ 32: # ════════════════════════════════════════════════════════════════════════════
+ 33: # 1. ReservaService — chequeo de Ocupación activa antes de crear
+ 34: # ════════════════════════════════════════════════════════════════════════════
+ 35: echo "📄  src/reserva/reserva.service.ts..."
+ 36: cat > src/reserva/reserva.service.ts << 'EOF'
+ 37: import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+ 38: import { CreateReservaDto } from './dto/create-reserva.dto';
+ 39: import { UpdateReservaDto } from './dto/update-reserva.dto';
+ 40: import { PrismaService } from 'prisma/prisma.service';
+ 41: import { AreaStatus } from '@prisma/client';
+ 42: 
+ 43: // ── Helpers de tiempo (Argentina, UTC-3) ────────────────────────────────────
+ 44: 
+ 45: function timeToMinutes(hhmm: string): number {
+ 46:   const [h, m] = hhmm.split(':').map(Number);
+ 47:   return h * 60 + m;
+ 48: }
+ 49: 
+ 50: function hoyArgentina(): string {
+ 51:   const ahora = new Date();
+ 52:   ahora.setHours(ahora.getHours() - 3);
+ 53:   return ahora.toISOString().split('T')[0];
+ 54: }
+ 55: 
+ 56: function nowMinutesArgentina(): number {
+ 57:   const ahora = new Date();
+ 58:   ahora.setHours(ahora.getHours() - 3);
+ 59:   return ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
+ 60: }
  61: 
- 62:   @ApiProperty({ description: 'Cantidad estimada de personas' })
- 63:   @Type(() => Number)
- 64:   @IsInt()
- 65:   @Min(1)
- 66:   cantidadPersonas: number;
- 67: 
- 68:   @ApiProperty({ description: 'Nombre del organizador / solicitante' })
- 69:   @IsString()
- 70:   @MinLength(2)
- 71:   organizador: string;
- 72: 
- 73:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
- 74:   @IsDateString()
- 75:   fechaDesde: string;
- 76: 
- 77:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
- 78:   @IsDateString()
- 79:   fechaHasta: string;
- 80: 
- 81:   @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
- 82:   @IsString()
- 83:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
- 84:   horaDesde: string;
- 85: 
- 86:   @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
- 87:   @IsString()
- 88:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
- 89:   horaHasta: string;
- 90: 
- 91:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
- 92:   @IsOptional()
- 93:   @Type(() => Number)
- 94:   @IsInt()
- 95:   @Min(0)
- 96:   @Max(120)
- 97:   edadMin?: number;
- 98: 
- 99:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
-100:   @IsOptional()
-101:   @Type(() => Number)
-102:   @IsInt()
-103:   @Min(0)
-104:   @Max(120)
-105:   edadMax?: number;
+ 62: @Injectable()
+ 63: export class ReservaService {
+ 64:   constructor(private prisma: PrismaService) {}
+ 65: 
+ 66:   // ── Verifica que no exista una Ocupación activa cubriendo hoy + hora actual ──
+ 67:   private async verificarOcupacionActiva(areaId: number): Promise<void> {
+ 68:     const hoy = hoyArgentina();
+ 69:     const nowMins = nowMinutesArgentina();
+ 70: 
+ 71:     const ocupacion = await this.prisma.ocupacion.findFirst({
+ 72:       where: {
+ 73:         liberadaAt: null,
+ 74:         areas: { some: { areaId } },
+ 75:         fechaDesde: { lte: new Date(`${hoy}T23:59:59.000Z`) },
+ 76:         fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
+ 77:       },
+ 78:     });
+ 79: 
+ 80:     if (!ocupacion) return;
+ 81: 
+ 82:     const fechaDesdeStr = ocupacion.fechaDesde.toISOString().split('T')[0];
+ 83:     const fechaHastaStr = ocupacion.fechaHasta.toISOString().split('T')[0];
+ 84: 
+ 85:     // Ocupación multi-día que ya arrancó y todavía no termina hoy → bloquea el día entero
+ 86:     if (fechaDesdeStr < hoy && fechaHastaStr > hoy) {
+ 87:       throw new BadRequestException(
+ 88:         `El área está ocupada por "${ocupacion.titulo}" hasta el ${fechaHastaStr}`,
+ 89:       );
+ 90:     }
+ 91: 
+ 92:     const desdeMin = fechaDesdeStr === hoy ? timeToMinutes(ocupacion.horaDesde) : 0;
+ 93:     const hastaMin = fechaHastaStr === hoy ? timeToMinutes(ocupacion.horaHasta) : 24 * 60;
+ 94: 
+ 95:     if (nowMins >= desdeMin && nowMins < hastaMin) {
+ 96:       throw new BadRequestException(
+ 97:         `El área está ocupada por "${ocupacion.titulo}" hoy de ${ocupacion.horaDesde} a ${ocupacion.horaHasta}`,
+ 98:       );
+ 99:     }
+100:   }
+101: 
+102:   async create(data: CreateReservaDto) {
+103:     const area = await this.prisma.area.findUnique({
+104:       where: { id: data.areaId },
+105:     });
 106: 
-107:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
-108:   @IsOptional()
-109:   @IsArray()
-110:   @IsUrl({}, { each: true })
-111:   @ArrayMaxSize(10)
-112:   anexos?: string[];
+107:     if (!area) throw new NotFoundException('Área no encontrada');
+108:     if (area.estado !== AreaStatus.LIBRE)
+109:       throw new BadRequestException('El área no está disponible');
+110: 
+111:     // Nuevo: valida contra Ocupaciones (día + rango horario), no solo el AreaStatus
+112:     await this.verificarOcupacionActiva(data.areaId);
 113: 
-114:   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
-115:   @IsArray()
-116:   @ArrayMinSize(1)
-117:   @Type(() => Number)
-118:   @IsInt({ each: true })
-119:   areaIds: number[];
-120: }
-121: EOF
-122: echo "✅  create-ocupacion.dto.ts"
-123: 
-124: # ════════════════════════════════════════════════════════════════════════════
-125: # 2. DTO update
-126: # ════════════════════════════════════════════════════════════════════════════
-127: cat > src/ocupacion/dto/update-ocupacion.dto.ts << 'EOF'
-128: import { PartialType } from '@nestjs/swagger';
-129: import { CreateOcupacionDto } from './create-ocupacion.dto';
-130: export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
-131: EOF
-132: echo "✅  update-ocupacion.dto.ts"
-133: 
-134: # ════════════════════════════════════════════════════════════════════════════
-135: # 3. Entity placeholder
-136: # ════════════════════════════════════════════════════════════════════════════
-137: cat > src/ocupacion/entities/ocupacion.entity.ts << 'EOF'
-138: export class Ocupacion {}
-139: EOF
-140: 
-141: # ════════════════════════════════════════════════════════════════════════════
-142: # 4. Service — conflict check + auto-liberar scheduler
-143: # ════════════════════════════════════════════════════════════════════════════
-144: echo "📄  src/ocupacion/ocupacion.service.ts..."
-145: cat > src/ocupacion/ocupacion.service.ts << 'EOF'
-146: import {
-147:   Injectable,
-148:   NotFoundException,
-149:   BadRequestException,
-150:   Logger,
-151: } from '@nestjs/common';
-152: import { Cron } from '@nestjs/schedule';
-153: import { PrismaService } from 'prisma/prisma.service';
-154: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-155: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-156: import { AreaStatus } from '@prisma/client';
-157: 
-158: // ── Helpers de tiempo ─────────────────────────────────────────────────────────
-159: 
-160: function timeToMinutes(hhmm: string): number {
-161:   const [h, m] = hhmm.split(':').map(Number);
-162:   return h * 60 + m;
-163: }
+114:     // Crear la reserva
+115:     const reserva = await this.prisma.reserva.create({ data });
+116: 
+117:     // Cambiar estado del área a OCUPADO
+118:     await this.prisma.area.update({
+119:       where: { id: data.areaId },
+120:       data: { estado: AreaStatus.OCUPADO },
+121:     });
+122: 
+123:     return reserva;
+124:   }
+125: 
+126:   findAll() {
+127:     return this.prisma.reserva.findMany({
+128:       include: { usuario: true, area: true },
+129:     });
+130:   }
+131: 
+132:   findOne(id: number) {
+133:     return this.prisma.reserva.findUnique({
+134:       where: { id },
+135:       include: { usuario: true, area: true },
+136:     });
+137:   }
+138: 
+139:   update(id: number, data: UpdateReservaDto) {
+140:     return this.prisma.reserva.update({
+141:       where: { id },
+142:       data,
+143:     });
+144:   }
+145: 
+146:   async completarReserva(id: number) {
+147:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
+148:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+149: 
+150:     // Finalizar reserva
+151:     const finalizada = await this.prisma.reserva.update({
+152:       where: { id },
+153:       data: { fin: new Date() },
+154:     });
+155: 
+156:     // Restaurar área a "LIBRE"
+157:     await this.prisma.area.update({
+158:       where: { id: reserva.areaId },
+159:       data: { estado: AreaStatus.LIBRE },
+160:     });
+161: 
+162:     return finalizada;
+163:   }
 164: 
-165: /** Construye un DateTime UTC combinando fecha YYYY-MM-DD y hora HH:mm */
-166: function buildDatetime(fecha: string, hora: string): Date {
-167:   return new Date(`${fecha}T${hora}:00.000Z`);
+165:   remove(id: number) {
+166:     return this.prisma.reserva.delete({ where: { id } });
+167:   }
 168: }
-169: 
-170: /** Fecha local Argentina como YYYY-MM-DD (UTC-3) */
-171: function hoyArgentina(): string {
-172:   const ahora = new Date();
-173:   ahora.setHours(ahora.getHours() - 3); // UTC-3
-174:   return ahora.toISOString().split('T')[0];
-175: }
-176: 
-177: @Injectable()
-178: export class OcupacionService {
-179:   private readonly logger = new Logger(OcupacionService.name);
-180: 
-181:   constructor(private readonly prisma: PrismaService) {}
+169: EOF
+170: echo "✅  reserva.service.ts"
+171: 
+172: # ════════════════════════════════════════════════════════════════════════════
+173: # 2. AreaService — bloquearTodas()
+174: # ════════════════════════════════════════════════════════════════════════════
+175: echo "📄  src/area/area.service.ts..."
+176: cat > src/area/area.service.ts << 'EOF'
+177: import { Injectable } from '@nestjs/common';
+178: import { CreateAreaDto } from './dto/create-area.dto';
+179: import { UpdateAreaDto } from './dto/update-area.dto';
+180: import { PrismaService } from 'prisma/prisma.service';
+181: import { AreaStatus } from '@prisma/client';
 182: 
-183:   // ── Verifica conflicto de horario para un área ────────────────────────────
-184:   private async verificarConflicto(
-185:     areaIds: number[],
-186:     fechaDesde: string,
-187:     fechaHasta: string,
-188:     horaDesde: string,
-189:     horaHasta: string,
-190:     excludeId?: number,
-191:   ): Promise<void> {
-192:     // Buscar ocupaciones activas (sin liberadaAt) que se superpongan en fecha
-193:     const ocupacionesActivas = await this.prisma.ocupacion.findMany({
-194:       where: {
-195:         liberadaAt: null,
-196:         ...(excludeId ? { id: { not: excludeId } } : {}),
-197:         areas: { some: { areaId: { in: areaIds } } },
-198:         // Superposición de rango de fechas
-199:         AND: [
-200:           { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
-201:           { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
-202:         ],
-203:       },
-204:       include: { areas: { include: { area: true } } },
-205:     });
-206: 
-207:     // Para cada ocupación con fecha solapada, verificar superposición de horario
-208:     const nuevaInicio = timeToMinutes(horaDesde);
-209:     const nuevaFin    = timeToMinutes(horaHasta);
+183: @Injectable()
+184: export class AreaService {
+185:   constructor(private prisma: PrismaService) {}
+186: 
+187:   create(data: CreateAreaDto) {
+188:     return this.prisma.area.create({ data });
+189:   }
+190: 
+191:   findAll() {
+192:     return this.prisma.area.findMany();
+193:   }
+194: 
+195:   findOne(id: number) {
+196:     return this.prisma.area.findUnique({ where: { id } });
+197:   }
+198: 
+199:   update(id: number, data: UpdateAreaDto) {
+200:     return this.prisma.area.update({
+201:       where: { id },
+202:       data
+203:     });
+204:   }
+205: 
+206:   async remove(id: number) {
+207:     await this.prisma.reserva.deleteMany({
+208:       where: { areaId: id },
+209:     });
 210: 
-211:     for (const oc of ocupacionesActivas) {
-212:       const existInicio = timeToMinutes(oc.horaDesde);
-213:       const existFin    = timeToMinutes(oc.horaHasta);
-214: 
-215:       // Hay solapamiento si los rangos se intersectan
-216:       const solapan = nuevaInicio < existFin && nuevaFin > existInicio;
-217:       if (!solapan) continue;
-218: 
-219:       const areasConflicto = oc.areas
-220:         .filter((r) => areaIds.includes(r.areaId))
-221:         .map((r) => r.area.nombre)
-222:         .join(', ');
+211:     return this.prisma.area.delete({
+212:       where: { id },
+213:     });
+214:   }
+215: 
+216:   // Cambiar estado del área
+217:   cambiarEstado(id: number, estado: AreaStatus) {
+218:     return this.prisma.area.update({
+219:       where: { id },
+220:       data: { estado }
+221:     });
+222:   }
 223: 
-224:       throw new BadRequestException(
-225:         `Conflicto de horario: las áreas [${areasConflicto}] ya están ocupadas ` +
-226:         `el ${oc.fechaDesde.toISOString().split('T')[0]} de ${oc.horaDesde} a ${oc.horaHasta} ` +
-227:         `(ocupación "${oc.titulo}")`,
-228:       );
-229:     }
-230:   }
-231: 
-232:   // ── CREATE ────────────────────────────────────────────────────────────────
-233:   async create(dto: CreateOcupacionDto) {
-234:     // Validaciones básicas
-235:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
-236:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-237:     }
-238:     if (dto.fechaDesde > dto.fechaHasta) {
-239:       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
-240:     }
-241:     if (dto.fechaDesde === dto.fechaHasta && dto.horaDesde >= dto.horaHasta) {
-242:       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
-243:     }
-244: 
-245:     // Verificar que las áreas existen
-246:     const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
-247:     if (areas.length !== dto.areaIds.length) {
-248:       const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
-249:       throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
-250:     }
-251: 
-252:     // Verificar conflicto de horario
-253:     await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
-254: 
-255:     // Crear ocupación + marcar áreas OCUPADO en transacción
-256:     const ocupacion = await this.prisma.$transaction(async (tx) => {
-257:       const nueva = await tx.ocupacion.create({
-258:         data: {
-259:           titulo:           dto.titulo,
-260:           requerimiento:    dto.requerimiento,
-261:           cantidadPersonas: dto.cantidadPersonas,
-262:           organizador:      dto.organizador,
-263:           fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`),
-264:           fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`),
-265:           horaDesde:        dto.horaDesde,
-266:           horaHasta:        dto.horaHasta,
-267:           edadMin:          dto.edadMin,
-268:           edadMax:          dto.edadMax,
-269:           anexos:           dto.anexos ?? [],
-270:           areas: { create: dto.areaIds.map((areaId) => ({ areaId })) },
-271:         },
-272:         include: { areas: { include: { area: true } } },
-273:       });
-274: 
-275:       await tx.area.updateMany({
-276:         where: { id: { in: dto.areaIds } },
-277:         data:  { estado: AreaStatus.OCUPADO },
-278:       });
-279: 
-280:       return nueva;
-281:     });
-282: 
-283:     return ocupacion;
-284:   }
-285: 
-286:   // ── FIND ALL ──────────────────────────────────────────────────────────────
-287:   findAll() {
-288:     return this.prisma.ocupacion.findMany({
-289:       orderBy: { fechaDesde: 'asc' },
-290:       include: { areas: { include: { area: true } } },
-291:     });
-292:   }
-293: 
-294:   // ── FIND ACTIVAS (sin liberadaAt, desde hoy) ──────────────────────────────
-295:   findActivas() {
-296:     const hoy = new Date(`${hoyArgentina()}T00:00:00.000Z`);
-297:     return this.prisma.ocupacion.findMany({
-298:       where: {
-299:         liberadaAt: null,
-300:         fechaHasta: { gte: hoy },
-301:       },
-302:       orderBy: { fechaDesde: 'asc' },
-303:       include: { areas: { include: { area: true } } },
-304:     });
-305:   }
-306: 
-307:   // ── FIND ONE ──────────────────────────────────────────────────────────────
-308:   async findOne(id: number) {
-309:     const ocupacion = await this.prisma.ocupacion.findUnique({
-310:       where: { id },
-311:       include: { areas: { include: { area: true } } },
-312:     });
-313:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
-314:     return ocupacion;
-315:   }
-316: 
-317:   // ── UPDATE ────────────────────────────────────────────────────────────────
-318:   async update(id: number, dto: UpdateOcupacionDto) {
-319:     const actual = await this.findOne(id);
-320: 
-321:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
-322:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-323:     }
-324: 
-325:     // Si cambió el horario/fecha, verificar conflictos excluyendo esta misma ocupación
-326:     const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
-327:     const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
-328:     const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
-329:     const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
-330:     const areaIds    = dto.areaIds    ?? actual.areas.map((r) => r.areaId);
-331: 
-332:     if (dto.fechaDesde || dto.fechaHasta || dto.horaDesde || dto.horaHasta || dto.areaIds) {
-333:       await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
-334:     }
-335: 
-336:     // Si cambian las áreas, actualizar relaciones y estados
-337:     if (dto.areaIds) {
-338:       const anterioresIds = actual.areas.map((r) => r.areaId);
-339:       await this.prisma.$transaction(async (tx) => {
-340:         // Liberar áreas que ya no están
-341:         const aLiberar = anterioresIds.filter((aid) => !dto.areaIds!.includes(aid));
-342:         if (aLiberar.length > 0) {
-343:           await tx.area.updateMany({ where: { id: { in: aLiberar } }, data: { estado: AreaStatus.LIBRE } });
-344:         }
-345:         // Ocupar áreas nuevas
-346:         const aNuevas = dto.areaIds!.filter((aid) => !anterioresIds.includes(aid));
-347:         if (aNuevas.length > 0) {
-348:           await tx.area.updateMany({ where: { id: { in: aNuevas } }, data: { estado: AreaStatus.OCUPADO } });
-349:         }
-350:         // Reemplazar relaciones
-351:         await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-352:         await tx.ocupacionArea.createMany({
-353:           data: dto.areaIds!.map((areaId) => ({ ocupacionId: id, areaId })),
-354:         });
-355:       });
-356:     }
-357: 
-358:     return this.prisma.ocupacion.update({
-359:       where: { id },
-360:       data: {
-361:         ...(dto.titulo           !== undefined && { titulo:           dto.titulo }),
-362:         ...(dto.requerimiento    !== undefined && { requerimiento:    dto.requerimiento }),
-363:         ...(dto.cantidadPersonas !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
-364:         ...(dto.organizador      !== undefined && { organizador:      dto.organizador }),
-365:         ...(dto.fechaDesde       !== undefined && { fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`) }),
-366:         ...(dto.fechaHasta       !== undefined && { fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`) }),
-367:         ...(dto.horaDesde        !== undefined && { horaDesde:        dto.horaDesde }),
-368:         ...(dto.horaHasta        !== undefined && { horaHasta:        dto.horaHasta }),
-369:         ...(dto.edadMin          !== undefined && { edadMin:          dto.edadMin }),
-370:         ...(dto.edadMax          !== undefined && { edadMax:          dto.edadMax }),
-371:         ...(dto.anexos           !== undefined && { anexos:           dto.anexos }),
-372:       },
-373:       include: { areas: { include: { area: true } } },
-374:     });
-375:   }
-376: 
-377:   // ── LIBERAR MANUAL ────────────────────────────────────────────────────────
-378:   async liberar(id: number) {
-379:     const ocupacion = await this.findOne(id);
-380:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
-381: 
-382:     await this.prisma.$transaction(async (tx) => {
-383:       if (areaIds.length > 0) {
-384:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
-385:       }
-386:       await tx.ocupacion.update({ where: { id }, data: { liberadaAt: new Date() } });
-387:     });
-388: 
-389:     return this.findOne(id);
-390:   }
-391: 
-392:   // ── REMOVE ────────────────────────────────────────────────────────────────
-393:   async remove(id: number) {
-394:     const ocupacion = await this.findOne(id);
-395:     const areaIds   = ocupacion.areas.map((r) => r.areaId);
-396: 
-397:     await this.prisma.$transaction(async (tx) => {
-398:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-399:       if (areaIds.length > 0) {
-400:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
-401:       }
-402:       await tx.ocupacion.delete({ where: { id } });
-403:     });
-404: 
-405:     return { message: `Ocupación ${id} eliminada y áreas liberadas` };
-406:   }
-407: 
-408:   // ── CRON: auto-liberar áreas cuando termina el evento ────────────────────
-409:   // Corre cada minuto. Libera ocupaciones donde fechaHasta+horaHasta < ahora
-410:   @Cron('* * * * *')
-411:   async autoLiberarVencidas() {
-412:     const ahora      = new Date();
-413:     const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000); // UTC-3
-414:     const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
-415:     const minutosNow = ahoraUTC3.getHours() * 60 + ahoraUTC3.getMinutes();
-416: 
-417:     try {
-418:       // Buscar ocupaciones activas cuya fechaHasta ya pasó o es hoy y horaHasta ya pasó
-419:       const candidatas = await this.prisma.ocupacion.findMany({
-420:         where: {
-421:           liberadaAt: null,
-422:           fechaHasta: { lte: new Date(`${fechaHoy}T23:59:59.000Z`) },
-423:         },
-424:         include: { areas: { include: { area: true } } },
-425:       });
-426: 
-427:       for (const oc of candidatas) {
-428:         const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
-429: 
-430:         // Si la fecha de fin ya pasó completamente
-431:         if (fechaFin < fechaHoy) {
-432:           await this.liberarInterno(oc);
-433:           continue;
-434:         }
-435: 
-436:         // Si es hoy, verificar que la hora ya pasó
-437:         if (fechaFin === fechaHoy) {
-438:           const minutosFin = timeToMinutes(oc.horaHasta);
-439:           if (minutosNow >= minutosFin) {
-440:             await this.liberarInterno(oc);
-441:           }
-442:         }
-443:       }
-444:     } catch (err) {
-445:       this.logger.error('Error en autoLiberarVencidas:', (err as Error).message);
-446:     }
-447:   }
-448: 
-449:   private async liberarInterno(oc: { id: number; areas: { areaId: number }[] }) {
-450:     const areaIds = oc.areas.map((r) => r.areaId);
-451:     await this.prisma.$transaction(async (tx) => {
-452:       if (areaIds.length > 0) {
-453:         await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
-454:       }
-455:       await tx.ocupacion.update({ where: { id: oc.id }, data: { liberadaAt: new Date() } });
-456:     });
-457:     this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
-458:   }
-459: }
-460: EOF
-461: echo "✅  ocupacion.service.ts"
-462: 
-463: # ════════════════════════════════════════════════════════════════════════════
-464: # 5. Controller — agrega GET /activas
-465: # ════════════════════════════════════════════════════════════════════════════
-466: echo "📄  src/ocupacion/ocupacion.controller.ts..."
-467: cat > src/ocupacion/ocupacion.controller.ts << 'EOF'
-468: import {
-469:   Controller,
-470:   Get,
-471:   Post,
-472:   Patch,
-473:   Delete,
-474:   Param,
-475:   Body,
-476:   ParseIntPipe,
-477:   HttpCode,
-478:   HttpStatus,
-479:   UsePipes,
-480:   ValidationPipe,
-481: } from '@nestjs/common';
-482: import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-483: import { OcupacionService } from './ocupacion.service';
-484: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
-485: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-486: 
-487: @ApiTags('ocupaciones')
-488: @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-489: @Controller('ocupaciones')
-490: export class OcupacionController {
-491:   constructor(private readonly ocupacionService: OcupacionService) {}
-492: 
-493:   @Post()
-494:   @HttpCode(HttpStatus.CREATED)
-495:   @ApiOperation({ summary: 'Crear ocupación — valida conflictos de horario y marca áreas OCUPADO' })
-496:   @ApiResponse({ status: 201, description: 'Ocupación creada' })
-497:   @ApiResponse({ status: 400, description: 'Datos inválidos o conflicto de horario' })
-498:   @ApiResponse({ status: 404, description: 'Área(s) no encontrada(s)' })
-499:   create(@Body() dto: CreateOcupacionDto) {
-500:     return this.ocupacionService.create(dto);
-501:   }
-502: 
-503:   @Get()
-504:   @ApiOperation({ summary: 'Listar todas las ocupaciones' })
-505:   findAll() {
-506:     return this.ocupacionService.findAll();
-507:   }
-508: 
-509:   @Get('activas')
-510:   @ApiOperation({ summary: 'Listar ocupaciones activas (sin liberadaAt, desde hoy)' })
-511:   findActivas() {
-512:     return this.ocupacionService.findActivas();
-513:   }
-514: 
-515:   @Get(':id')
-516:   @ApiOperation({ summary: 'Obtener una ocupación por ID' })
-517:   @ApiResponse({ status: 404, description: 'No encontrada' })
-518:   findOne(@Param('id', ParseIntPipe) id: number) {
-519:     return this.ocupacionService.findOne(id);
-520:   }
-521: 
-522:   @Patch(':id')
-523:   @ApiOperation({ summary: 'Actualizar ocupación — revalida conflictos si cambia horario/áreas' })
-524:   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOcupacionDto) {
-525:     return this.ocupacionService.update(id, dto);
-526:   }
-527: 
-528:   @Patch(':id/liberar')
-529:   @ApiOperation({ summary: 'Liberar ocupación manualmente → áreas vuelven a LIBRE' })
-530:   liberar(@Param('id', ParseIntPipe) id: number) {
-531:     return this.ocupacionService.liberar(id);
-532:   }
-533: 
-534:   @Delete(':id')
-535:   @HttpCode(HttpStatus.NO_CONTENT)
-536:   @ApiOperation({ summary: 'Eliminar ocupación y liberar sus áreas' })
-537:   remove(@Param('id', ParseIntPipe) id: number) {
-538:     return this.ocupacionService.remove(id);
-539:   }
-540: }
-541: EOF
-542: echo "✅  ocupacion.controller.ts"
-543: 
-544: # ════════════════════════════════════════════════════════════════════════════
-545: # 6. Module — asegurar que ScheduleModule esté en AppModule
-546: # ════════════════════════════════════════════════════════════════════════════
-547: echo ""
-548: echo "📄  Verificando ScheduleModule en app.module.ts..."
-549: if ! grep -q "ScheduleModule" src/app.module.ts; then
-550:   node - << 'JSEOF'
-551: const fs  = require('fs')
-552: const path = 'src/app.module.ts'
-553: let src    = fs.readFileSync(path, 'utf8')
-554: 
-555: // Agregar import de ScheduleModule
-556: if (!src.includes('@nestjs/schedule')) {
-557:   src = `import { ScheduleModule } from '@nestjs/schedule';\n` + src
-558: }
-559: 
-560: // Agregar ScheduleModule.forRoot() en imports
-561: src = src.replace(
-562:   /imports:\s*\[/,
-563:   `imports: [\n    ScheduleModule.forRoot(),`
-564: )
-565: 
-566: fs.writeFileSync(path, src, 'utf8')
-567: console.log('✅  ScheduleModule agregado a app.module.ts')
-568: JSEOF
-569: fi
-570: 
-571: # ════════════════════════════════════════════════════════════════════════════
-572: # 7. Instalar @nestjs/schedule si no está
-573: # ════════════════════════════════════════════════════════════════════════════
-574: echo ""
-575: echo "📦  Verificando @nestjs/schedule..."
-576: if ! grep -q '"@nestjs/schedule"' package.json; then
-577:   pnpm add @nestjs/schedule
-578:   echo "✅  @nestjs/schedule instalado"
-579: else
-580:   echo "ℹ️   @nestjs/schedule ya presente"
-581: fi
-582: 
-583: # ════════════════════════════════════════════════════════════════════════════
-584: # 8. Build
-585: # ════════════════════════════════════════════════════════════════════════════
-586: echo ""
-587: echo "🔨  Compilando..."
-588: pnpm build
-589: 
-590: echo ""
-591: echo "╔══════════════════════════════════════════════════════════════════╗"
-592: echo "║  ✅  v5-back-ocupacion-fechas.sh — v1.0.0 completado            ║"
-593: echo "╚══════════════════════════════════════════════════════════════════╝"
-594: echo ""
-595: echo "  Nuevos endpoints:"
-596: echo "    POST  /ocupaciones        → crea, valida conflicto de horario"
-597: echo "    GET   /ocupaciones/activas → solo activas desde hoy"
-598: echo "    PATCH /ocupaciones/:id/liberar"
-599: echo ""
-600: echo "  Cron cada 1 min → auto-libera áreas al terminar el evento"
-601: echo ""
-602: echo "  ⚠️  Verificá que en app.module.ts esté ScheduleModule.forRoot()"
-603: echo ""
+224:   // ── Bloquea/libera TODAS las áreas de una vez ───────────────────────────
+225:   // Usado por el admin (bloqueo manual por evento) y por calendario-back
+226:   // (sincronización automática cuando un Evento con área COWORKING
+227:   // entra/sale de EN_CURSO).
+228:   async bloquearTodas(estado: AreaStatus) {
+229:     if (estado === AreaStatus.OCUPADO) {
+230:       await this.prisma.area.updateMany({
+231:         data: { estado: AreaStatus.OCUPADO },
+232:       });
+233:     } else {
+234:       // Al liberar, no tocar las áreas que tengan una reserva de persona
+235:       // activa (fin: null) — evita pisar una reserva real en curso.
+236:       const reservasActivas = await this.prisma.reserva.findMany({
+237:         where: { fin: null },
+238:         select: { areaId: true },
+239:       });
+240:       const idsOcupados = reservasActivas.map((r) => r.areaId);
+241: 
+242:       await this.prisma.area.updateMany({
+243:         where: { id: { notIn: idsOcupados } },
+244:         data: { estado: AreaStatus.LIBRE },
+245:       });
+246:     }
+247: 
+248:     return this.prisma.area.findMany();
+249:   }
+250: }
+251: EOF
+252: echo "✅  area.service.ts"
+253: 
+254: # ════════════════════════════════════════════════════════════════════════════
+255: # 3. AreaController — endpoint bulk
+256: # ════════════════════════════════════════════════════════════════════════════
+257: echo "📄  src/area/area.controller.ts..."
+258: cat > src/area/area.controller.ts << 'EOF'
+259: import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+260: import { AreaService } from './area.service';
+261: import { CreateAreaDto } from './dto/create-area.dto';
+262: import { UpdateAreaDto } from './dto/update-area.dto';
+263: import { ApiTags } from '@nestjs/swagger';
+264: import { AreaStatus } from '@prisma/client';
+265: 
+266: @ApiTags('areas')
+267: @Controller('areas')
+268: export class AreaController {
+269:   constructor(private readonly areaService: AreaService) {}
+270: 
+271:   @Post()
+272:   create(@Body() dto: CreateAreaDto) {
+273:     return this.areaService.create(dto);
+274:   }
+275: 
+276:   @Get()
+277:   findAll() {
+278:     return this.areaService.findAll();
+279:   }
+280: 
+281:   // Bulk: PATCH /areas/bloquear-todas/OCUPADO | LIBRE
+282:   @Patch('bloquear-todas/:estado')
+283:   bloquearTodas(@Param('estado') estado: AreaStatus) {
+284:     return this.areaService.bloquearTodas(estado);
+285:   }
+286: 
+287:   @Get(':id')
+288:   findOne(@Param('id') id: string) {
+289:     return this.areaService.findOne(+id);
+290:   }
+291: 
+292:   @Patch(':id')
+293:   update(@Param('id') id: string, @Body() dto: UpdateAreaDto) {
+294:     return this.areaService.update(+id, dto);
+295:   }
+296: 
+297:   @Patch(':id/estado/:estado')
+298:   cambiarEstado(
+299:     @Param('id') id: string,
+300:     @Param('estado') estado: AreaStatus
+301:   ) {
+302:     return this.areaService.cambiarEstado(+id, estado);
+303:   }
+304: 
+305:   @Delete(':id')
+306:   remove(@Param('id') id: string) {
+307:     return this.areaService.remove(+id);
+308:   }
+309: }
+310: EOF
+311: echo "✅  area.controller.ts"
+312: 
+313: # ════════════════════════════════════════════════════════════════════════════
+314: # 4. Build
+315: # ════════════════════════════════════════════════════════════════════════════
+316: echo ""
+317: echo "🔨  Compilando..."
+318: pnpm build
+319: 
+320: echo ""
+321: echo "╔══════════════════════════════════════════════════════════════════╗"
+322: echo "║  ✅  v6-back-reserva-vs-ocupacion.sh — v1.0.0 completado          ║"
+323: echo "╚══════════════════════════════════════════════════════════════════╝"
+324: echo ""
+325: echo "  Cambios:"
+326: echo "    · POST /reservas ahora rechaza si hay Ocupación activa (día+hora)"
+327: echo "    · PATCH /areas/bloquear-todas/:estado (OCUPADO | LIBRE) — nuevo"
+328: echo ""
+329: echo "  ⚠️  No requiere prisma migrate (no hay cambios de schema)"
+330: echo ""
 ````
 
 ## File: src/app.module.ts

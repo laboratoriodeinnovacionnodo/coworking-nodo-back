@@ -17,16 +17,22 @@ function timeToMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-/** Construye un DateTime UTC combinando fecha YYYY-MM-DD y hora HH:mm */
-function buildDatetime(fecha: string, hora: string): Date {
-  return new Date(`${fecha}T${hora}:00.000Z`);
-}
-
-/** Fecha local Argentina como YYYY-MM-DD (UTC-3) */
+/**
+ * Fecha local Argentina como YYYY-MM-DD (UTC-3).
+ * Usa Intl.DateTimeFormat (inmutable) en lugar de setHours() mutable,
+ * que era la causa del bug en findActivas().
+ */
 function hoyArgentina(): string {
-  const ahora = new Date();
-  ahora.setHours(ahora.getHours() - 3); // UTC-3
-  return ahora.toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year:     'numeric',
+    month:    '2-digit',
+    day:      '2-digit',
+  })
+    .format(new Date())
+    .split('/')               // dd/mm/yyyy
+    .reverse()                // yyyy, mm, dd
+    .join('-');               // yyyy-mm-dd
 }
 
 @Injectable()
@@ -44,13 +50,11 @@ export class OcupacionService {
     horaHasta: string,
     excludeId?: number,
   ): Promise<void> {
-    // Buscar ocupaciones activas (sin liberadaAt) que se superpongan en fecha
     const ocupacionesActivas = await this.prisma.ocupacion.findMany({
       where: {
         liberadaAt: null,
         ...(excludeId ? { id: { not: excludeId } } : {}),
         areas: { some: { areaId: { in: areaIds } } },
-        // Superposición de rango de fechas
         AND: [
           { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
           { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
@@ -59,16 +63,13 @@ export class OcupacionService {
       include: { areas: { include: { area: true } } },
     });
 
-    // Para cada ocupación con fecha solapada, verificar superposición de horario
     const nuevaInicio = timeToMinutes(horaDesde);
     const nuevaFin    = timeToMinutes(horaHasta);
 
     for (const oc of ocupacionesActivas) {
       const existInicio = timeToMinutes(oc.horaDesde);
       const existFin    = timeToMinutes(oc.horaHasta);
-
-      // Hay solapamiento si los rangos se intersectan
-      const solapan = nuevaInicio < existFin && nuevaFin > existInicio;
+      const solapan     = nuevaInicio < existFin && nuevaFin > existInicio;
       if (!solapan) continue;
 
       const areasConflicto = oc.areas
@@ -86,7 +87,6 @@ export class OcupacionService {
 
   // ── CREATE ────────────────────────────────────────────────────────────────
   async create(dto: CreateOcupacionDto) {
-    // Validaciones básicas
     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
     }
@@ -97,17 +97,14 @@ export class OcupacionService {
       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
     }
 
-    // Verificar que las áreas existen
     const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
     if (areas.length !== dto.areaIds.length) {
       const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
       throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
     }
 
-    // Verificar conflicto de horario
     await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
 
-    // Crear ocupación + marcar áreas OCUPADO en transacción
     const ocupacion = await this.prisma.$transaction(async (tx) => {
       const nueva = await tx.ocupacion.create({
         data: {
@@ -146,13 +143,14 @@ export class OcupacionService {
     });
   }
 
-  // ── FIND ACTIVAS (sin liberadaAt, desde hoy) ──────────────────────────────
+  // ── FIND ACTIVAS (sin liberadaAt, fechaHasta >= hoy Argentina) ────────────
   findActivas() {
-    const hoy = new Date(`${hoyArgentina()}T00:00:00.000Z`);
+    // hoyArgentina() ahora usa Intl.DateTimeFormat — no más bug de setHours()
+    const hoy = hoyArgentina();
     return this.prisma.ocupacion.findMany({
       where: {
         liberadaAt: null,
-        fechaHasta: { gte: hoy },
+        fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
       },
       orderBy: { fechaDesde: 'asc' },
       include: { areas: { include: { area: true } } },
@@ -177,38 +175,13 @@ export class OcupacionService {
       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
     }
 
-    // Si cambió el horario/fecha, verificar conflictos excluyendo esta misma ocupación
     const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
     const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
     const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
     const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
-    const areaIds    = dto.areaIds    ?? actual.areas.map((r) => r.areaId);
+    const areaIds    = dto.areaIds    ?? actual.areas.map((r: { areaId: number }) => r.areaId);
 
-    if (dto.fechaDesde || dto.fechaHasta || dto.horaDesde || dto.horaHasta || dto.areaIds) {
-      await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
-    }
-
-    // Si cambian las áreas, actualizar relaciones y estados
-    if (dto.areaIds) {
-      const anterioresIds = actual.areas.map((r) => r.areaId);
-      await this.prisma.$transaction(async (tx) => {
-        // Liberar áreas que ya no están
-        const aLiberar = anterioresIds.filter((aid) => !dto.areaIds!.includes(aid));
-        if (aLiberar.length > 0) {
-          await tx.area.updateMany({ where: { id: { in: aLiberar } }, data: { estado: AreaStatus.LIBRE } });
-        }
-        // Ocupar áreas nuevas
-        const aNuevas = dto.areaIds!.filter((aid) => !anterioresIds.includes(aid));
-        if (aNuevas.length > 0) {
-          await tx.area.updateMany({ where: { id: { in: aNuevas } }, data: { estado: AreaStatus.OCUPADO } });
-        }
-        // Reemplazar relaciones
-        await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-        await tx.ocupacionArea.createMany({
-          data: dto.areaIds!.map((areaId) => ({ ocupacionId: id, areaId })),
-        });
-      });
-    }
+    await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
 
     return this.prisma.ocupacion.update({
       where: { id },
@@ -229,48 +202,52 @@ export class OcupacionService {
     });
   }
 
-  // ── LIBERAR MANUAL ────────────────────────────────────────────────────────
+  // ── LIBERAR ───────────────────────────────────────────────────────────────
   async liberar(id: number) {
     const ocupacion = await this.findOne(id);
-    const areaIds   = ocupacion.areas.map((r) => r.areaId);
+    const areaIds   = ocupacion.areas.map((r: { areaId: number }) => r.areaId);
 
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       if (areaIds.length > 0) {
-        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+        await tx.area.updateMany({
+          where: { id: { in: areaIds } },
+          data:  { estado: AreaStatus.LIBRE },
+        });
       }
-      await tx.ocupacion.update({ where: { id }, data: { liberadaAt: new Date() } });
+      return tx.ocupacion.update({
+        where: { id },
+        data:  { liberadaAt: new Date() },
+        include: { areas: { include: { area: true } } },
+      });
     });
-
-    return this.findOne(id);
   }
 
-  // ── REMOVE ────────────────────────────────────────────────────────────────
+  // ── DELETE ────────────────────────────────────────────────────────────────
   async remove(id: number) {
     const ocupacion = await this.findOne(id);
-    const areaIds   = ocupacion.areas.map((r) => r.areaId);
+    const areaIds   = ocupacion.areas.map((r: { areaId: number }) => r.areaId);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
       if (areaIds.length > 0) {
-        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+        await tx.area.updateMany({
+          where: { id: { in: areaIds } },
+          data:  { estado: AreaStatus.LIBRE },
+        });
       }
       await tx.ocupacion.delete({ where: { id } });
     });
-
-    return { message: `Ocupación ${id} eliminada y áreas liberadas` };
   }
 
-  // ── CRON: auto-liberar áreas cuando termina el evento ────────────────────
-  // Corre cada minuto. Libera ocupaciones donde fechaHasta+horaHasta < ahora
+  // ── AUTO-LIBERAR (cron cada minuto) ───────────────────────────────────────
   @Cron('* * * * *')
   async autoLiberarVencidas() {
     const ahora      = new Date();
-    const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000); // UTC-3
+    // UTC-3 inmutable
+    const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000);
     const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
-    const minutosNow = ahoraUTC3.getHours() * 60 + ahoraUTC3.getMinutes();
+    const minutosNow = ahoraUTC3.getUTCHours() * 60 + ahoraUTC3.getUTCMinutes();
 
     try {
-      // Buscar ocupaciones activas cuya fechaHasta ya pasó o es hoy y horaHasta ya pasó
       const candidatas = await this.prisma.ocupacion.findMany({
         where: {
           liberadaAt: null,
@@ -282,13 +259,11 @@ export class OcupacionService {
       for (const oc of candidatas) {
         const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
 
-        // Si la fecha de fin ya pasó completamente
         if (fechaFin < fechaHoy) {
           await this.liberarInterno(oc);
           continue;
         }
 
-        // Si es hoy, verificar que la hora ya pasó
         if (fechaFin === fechaHoy) {
           const minutosFin = timeToMinutes(oc.horaHasta);
           if (minutosNow >= minutosFin) {
@@ -305,9 +280,15 @@ export class OcupacionService {
     const areaIds = oc.areas.map((r) => r.areaId);
     await this.prisma.$transaction(async (tx) => {
       if (areaIds.length > 0) {
-        await tx.area.updateMany({ where: { id: { in: areaIds } }, data: { estado: AreaStatus.LIBRE } });
+        await tx.area.updateMany({
+          where: { id: { in: areaIds } },
+          data:  { estado: AreaStatus.LIBRE },
+        });
       }
-      await tx.ocupacion.update({ where: { id: oc.id }, data: { liberadaAt: new Date() } });
+      await tx.ocupacion.update({
+        where: { id: oc.id },
+        data:  { liberadaAt: new Date() },
+      });
     });
     this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
   }
