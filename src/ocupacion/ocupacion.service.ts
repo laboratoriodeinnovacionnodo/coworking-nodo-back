@@ -97,7 +97,7 @@ export class OcupacionService {
       const ocupacion = await tx.ocupacion.create({
         data: {
           ...rest,
-          telefono: telefono ?? null,
+          telefono: telefono ?? undefined,
           fechaDesde: fechaDesdeDate,
           fechaHasta: fechaHastaDate,
           horaDesde,
