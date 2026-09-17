@@ -1,0 +1,1 @@
+ALTER TABLE "Ocupacion" ADD COLUMN IF NOT EXISTS "telefono" TEXT;

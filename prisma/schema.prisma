@@ -70,6 +70,7 @@ model Ocupacion {
   requerimiento    String
   cantidadPersonas Int
   organizador      String
+  telefono         String
   // ── Reemplaza dia: String + hora: String ──
   fechaDesde       DateTime
   fechaHasta       DateTime

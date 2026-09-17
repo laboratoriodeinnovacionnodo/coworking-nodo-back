@@ -37,6 +37,11 @@ export class CreateOcupacionDto {
   @MinLength(2)
   organizador: string;
 
+  @ApiPropertyOptional({ description: 'Teléfono de contacto del organizador' })
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
   @IsDateString()
   fechaDesde: string;
@@ -71,11 +76,11 @@ export class CreateOcupacionDto {
   @Max(120)
   edadMax?: number;
 
-  @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
+  @ApiPropertyOptional({ description: 'URLs de anexos / documentos', type: [String] })
   @IsOptional()
   @IsArray()
-  @IsUrl({}, { each: true })
   @ArrayMaxSize(10)
+  @IsUrl({}, { each: true })
   anexos?: string[];
 
   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
