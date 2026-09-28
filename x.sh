@@ -1,247 +1,328 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  v28-back-editar-reserva.sh  — coworking-back
-#  Mejora el endpoint PATCH /reservas/:id con validación real de negocio:
-#  - Permite editar nombre, detalles y recepcion sin side-effects
-#  - Si cambia el areaId: libera el área vieja y valida/ocupa la nueva
+#  v29-back-editar-ocupacion.sh  — coworking-back
+#  Agrega update() completo a OcupacionService: edita todos los campos
+#  incluyendo reasignación de áreas con revalidación de conflictos.
 # ============================================================================
 set -euo pipefail
 
 [[ -f "package.json" && -d "src" ]] || { echo "❌  Corré desde la raíz de coworking-back"; exit 1; }
 
 echo "════════════════════════════════════════════════════════"
-echo "  v28-back-editar-reserva  |  coworking-back"
+echo "  v29-back-editar-ocupacion  |  coworking-back"
 echo "════════════════════════════════════════════════════════"
 echo ""
 
-# ── src/reserva/reserva.service.ts ───────────────────────────────────────────
-echo "📝  Actualizando reserva.service.ts..."
-cat > src/reserva/reserva.service.ts << 'EOF'
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { CreateReservaDto } from './dto/create-reserva.dto';
-import { UpdateReservaDto } from './dto/update-reserva.dto';
+# ── src/ocupacion/ocupacion.service.ts ───────────────────────────────────────
+echo "📝  Actualizando ocupacion.service.ts..."
+cat > src/ocupacion/ocupacion.service.ts << 'EOF'
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
 import { AreaStatus } from '@prisma/client';
 
-// ── Helpers de tiempo (Argentina, UTC-3) ─────────────────────────────────────
-
+// ── helpers ──────────────────────────────────────────────────────────────────
 function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 }
 
-function hoyArgentina(): string {
-  const ahora = new Date();
-  ahora.setHours(ahora.getHours() - 3);
-  return ahora.toISOString().split('T')[0];
+function rangosSolapan(
+  aDesde: Date, aHasta: Date, aHoraDesde: string, aHoraHasta: string,
+  bDesde: Date, bHasta: Date, bHoraDesde: string, bHoraHasta: string,
+): boolean {
+  const aD = aDesde.toISOString().split('T')[0];
+  const aH = aHasta.toISOString().split('T')[0];
+  const bD = bDesde.toISOString().split('T')[0];
+  const bH = bHasta.toISOString().split('T')[0];
+
+  if (aD > bH || aH < bD) return false;
+
+  const aDesdeMin = timeToMinutes(aHoraDesde);
+  const aHastaMin = timeToMinutes(aHoraHasta);
+  const bDesdeMin = timeToMinutes(bHoraDesde);
+  const bHastaMin = timeToMinutes(bHoraHasta);
+
+  return aDesdeMin < bHastaMin && aHastaMin > bDesdeMin;
 }
 
-function nowMinutesArgentina(): number {
-  const ahora = new Date();
-  ahora.setHours(ahora.getHours() - 3);
-  return ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
-}
-
+// ── service ──────────────────────────────────────────────────────────────────
 @Injectable()
-export class ReservaService {
+export class OcupacionService {
   constructor(private prisma: PrismaService) {}
 
-  // ── Verifica que no exista una Ocupación activa para el área ──────────────
-  private async verificarOcupacionActiva(areaId: number): Promise<void> {
-    const hoy     = hoyArgentina();
-    const nowMins = nowMinutesArgentina();
+  // ── CREATE ─────────────────────────────────────────────────────────────────
+  async create(dto: CreateOcupacionDto) {
+    const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
 
-    const ocupacion = await this.prisma.ocupacion.findFirst({
-      where: {
-        liberadaAt: null,
-        areas: { some: { areaId } },
-        fechaDesde: { lte: new Date(`${hoy}T23:59:59.000Z`) },
-        fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
-      },
-    });
+    const fechaDesdeDate = new Date(`${fechaDesde}T00:00:00.000Z`);
+    const fechaHastaDate = new Date(`${fechaHasta}T00:00:00.000Z`);
 
-    if (!ocupacion) return;
-
-    const fechaDesdeStr = ocupacion.fechaDesde.toISOString().split('T')[0];
-    const fechaHastaStr = ocupacion.fechaHasta.toISOString().split('T')[0];
-
-    if (fechaDesdeStr < hoy && fechaHastaStr > hoy) {
-      throw new BadRequestException(
-        `El área está ocupada por "${ocupacion.titulo}" hasta el ${fechaHastaStr}`,
-      );
+    if (fechaDesdeDate > fechaHastaDate) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (timeToMinutes(horaDesde) >= timeToMinutes(horaHasta)) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
     }
 
-    const desdeMin = fechaDesdeStr === hoy ? timeToMinutes(ocupacion.horaDesde) : 0;
-    const hastaMin = fechaHastaStr === hoy ? timeToMinutes(ocupacion.horaHasta) : 24 * 60;
-
-    if (nowMins >= desdeMin && nowMins < hastaMin) {
-      throw new BadRequestException(
-        `El área está ocupada por "${ocupacion.titulo}" hoy de ${ocupacion.horaDesde} a ${ocupacion.horaHasta}`,
-      );
-    }
-  }
-
-  // ── CREATE ────────────────────────────────────────────────────────────────
-  async create(data: CreateReservaDto) {
-    const area = await this.prisma.area.findUnique({ where: { id: data.areaId } });
-
-    if (!area) throw new NotFoundException('Área no encontrada');
-    if (area.estado !== AreaStatus.LIBRE)
-      throw new BadRequestException('El área no está disponible');
-
-    await this.verificarOcupacionActiva(data.areaId);
-
-    const reserva = await this.prisma.reserva.create({ data });
-
-    await this.prisma.area.update({
-      where: { id: data.areaId },
-      data: { estado: AreaStatus.OCUPADO },
-    });
-
-    return reserva;
-  }
-
-  // ── FIND ALL ──────────────────────────────────────────────────────────────
-  findAll() {
-    return this.prisma.reserva.findMany({
-      include: { usuario: true, area: true },
-    });
-  }
-
-  // ── FIND ONE ──────────────────────────────────────────────────────────────
-  findOne(id: number) {
-    return this.prisma.reserva.findUnique({
-      where: { id },
-      include: { usuario: true, area: true },
-    });
-  }
-
-  // ── UPDATE ────────────────────────────────────────────────────────────────
-  // Permite editar: nombre, detalles, recepcion (seguros, sin side-effects).
-  // Si cambia areaId: libera el área vieja, valida y ocupa la nueva.
-  async update(id: number, dto: UpdateReservaDto) {
-    const reserva = await this.prisma.reserva.findUnique({
-      where: { id },
-      include: { area: true },
-    });
-
-    if (!reserva) throw new NotFoundException('Reserva no encontrada');
-    if (reserva.fin !== null)
-      throw new BadRequestException('No se puede editar una reserva ya completada');
-
-    const { areaId, ...camposSeguros } = dto;
-
-    // ── Sin cambio de área: actualización simple ──────────────────────────
-    if (!areaId || areaId === reserva.areaId) {
-      return this.prisma.reserva.update({
-        where: { id },
-        data: camposSeguros,
-        include: { usuario: true, area: true },
-      });
+    const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+    if (areas.length !== areaIds.length) {
+      const encontrados = areas.map((a) => a.id);
+      const faltantes   = areaIds.filter((id) => !encontrados.includes(id));
+      throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
     }
 
-    // ── Cambio de área: validar nueva área y reasignar ────────────────────
-    const nuevaArea = await this.prisma.area.findUnique({ where: { id: areaId } });
-
-    if (!nuevaArea) throw new NotFoundException('Área nueva no encontrada');
-    if (nuevaArea.estado !== AreaStatus.LIBRE)
-      throw new BadRequestException('El área nueva no está disponible');
-
-    await this.verificarOcupacionActiva(areaId);
+    await this._validarConflictos(areaIds, fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta);
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Actualizar reserva con nueva área + campos
-      const actualizada = await tx.reserva.update({
-        where: { id },
-        data: { ...camposSeguros, areaId },
-        include: { usuario: true, area: true },
-      });
-
-      // 2. Liberar área anterior (si no tiene otras reservas activas)
-      const otrasReservasEnAreaVieja = await tx.reserva.count({
-        where: {
-          areaId: reserva.areaId,
-          fin: null,
-          id: { not: id },
+      const ocupacion = await tx.ocupacion.create({
+        data: {
+          ...rest,
+          telefono: telefono ?? undefined,
+          fechaDesde: fechaDesdeDate,
+          fechaHasta: fechaHastaDate,
+          horaDesde,
+          horaHasta,
+          areas: { create: areaIds.map((areaId) => ({ areaId })) },
         },
+        include: { areas: { include: { area: true } } },
       });
 
-      if (otrasReservasEnAreaVieja === 0) {
-        await tx.area.update({
-          where: { id: reserva.areaId },
-          data: { estado: AreaStatus.LIBRE },
-        });
+      await tx.area.updateMany({
+        where: { id: { in: areaIds } },
+        data:  { estado: AreaStatus.OCUPADO },
+      });
+
+      return ocupacion;
+    });
+  }
+
+  // ── FIND ALL ───────────────────────────────────────────────────────────────
+  findAll() {
+    return this.prisma.ocupacion.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { areas: { include: { area: true } } },
+    });
+  }
+
+  // ── FIND ACTIVAS ───────────────────────────────────────────────────────────
+  findActivas() {
+    const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
+    return this.prisma.ocupacion.findMany({
+      where: { liberadaAt: null, fechaHasta: { gte: hoy } },
+      orderBy: { fechaDesde: 'asc' },
+      include: { areas: { include: { area: true } } },
+    });
+  }
+
+  // ── FIND ONE ───────────────────────────────────────────────────────────────
+  async findOne(id: number) {
+    const oc = await this.prisma.ocupacion.findUnique({
+      where: { id },
+      include: { areas: { include: { area: true } } },
+    });
+    if (!oc) throw new NotFoundException('Ocupación no encontrada');
+    return oc;
+  }
+
+  // ── UPDATE (completo) ──────────────────────────────────────────────────────
+  async update(id: number, dto: UpdateOcupacionDto) {
+    const oc = await this.findOne(id);
+
+    const {
+      areaIds,
+      fechaDesde,
+      fechaHasta,
+      horaDesde,
+      horaHasta,
+      telefono,
+      ...rest
+    } = dto;
+
+    // Fechas efectivas (las nuevas o las actuales)
+    const fechaDesdeDate = fechaDesde
+      ? new Date(`${fechaDesde}T00:00:00.000Z`)
+      : oc.fechaDesde;
+    const fechaHastaDate = fechaHasta
+      ? new Date(`${fechaHasta}T00:00:00.000Z`)
+      : oc.fechaHasta;
+
+    const horaDesdeEfectiva = horaDesde ?? oc.horaDesde;
+    const horaHastaEfectiva = horaHasta ?? oc.horaHasta;
+
+    // Validar coherencia horaria
+    if (fechaDesdeDate > fechaHastaDate) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (timeToMinutes(horaDesdeEfectiva) >= timeToMinutes(horaHastaEfectiva)) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+    }
+
+    // IDs efectivos de áreas
+    const areaIdsEfectivos = areaIds ?? oc.areas.map((r) => r.areaId);
+
+    // Si cambian áreas o fechas/horas, revalidar conflictos excluyendo esta misma ocupación
+    const cambiaHorario =
+      areaIds !== undefined ||
+      fechaDesde !== undefined ||
+      fechaHasta !== undefined ||
+      horaDesde !== undefined ||
+      horaHasta !== undefined;
+
+    if (cambiaHorario) {
+      // Verificar que todas las áreas nuevas existen
+      if (areaIds !== undefined) {
+        const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+        if (areas.length !== areaIds.length) {
+          const faltantes = areaIds.filter((aid) => !areas.find((a) => a.id === aid));
+          throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
+        }
       }
 
-      // 3. Marcar nueva área como OCUPADO
-      await tx.area.update({
-        where: { id: areaId },
-        data: { estado: AreaStatus.OCUPADO },
+      await this._validarConflictos(
+        areaIdsEfectivos,
+        fechaDesdeDate,
+        fechaHastaDate,
+        horaDesdeEfectiva,
+        horaHastaEfectiva,
+        id, // excluir la ocupación actual
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Si cambian las áreas: liberar las viejas y ocupar las nuevas
+      if (areaIds !== undefined) {
+        const viejasIds = oc.areas.map((r) => r.areaId);
+        const nuevasIds = areaIds;
+
+        const liberadas = viejasIds.filter((aid) => !nuevasIds.includes(aid));
+        const agregadas = nuevasIds.filter((aid) => !viejasIds.includes(aid));
+
+        if (liberadas.length > 0) {
+          await tx.area.updateMany({
+            where: { id: { in: liberadas } },
+            data:  { estado: AreaStatus.LIBRE },
+          });
+        }
+        if (agregadas.length > 0) {
+          await tx.area.updateMany({
+            where: { id: { in: agregadas } },
+            data:  { estado: AreaStatus.OCUPADO },
+          });
+        }
+      }
+
+      const actualizada = await tx.ocupacion.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(telefono !== undefined && { telefono: telefono || null }),
+          fechaDesde: fechaDesdeDate,
+          fechaHasta: fechaHastaDate,
+          horaDesde:  horaDesdeEfectiva,
+          horaHasta:  horaHastaEfectiva,
+          ...(areaIds !== undefined && {
+            areas: {
+              deleteMany: {},
+              create: areaIds.map((areaId) => ({ areaId })),
+            },
+          }),
+        },
+        include: { areas: { include: { area: true } } },
       });
 
       return actualizada;
     });
   }
 
-  // ── COMPLETAR ─────────────────────────────────────────────────────────────
-  async completarReserva(id: number) {
-    const reserva = await this.prisma.reserva.findUnique({ where: { id } });
-    if (!reserva) throw new NotFoundException('Reserva no encontrada');
+  // ── LIBERAR ────────────────────────────────────────────────────────────────
+  async liberar(id: number) {
+    const oc = await this.findOne(id);
 
-    const finalizada = await this.prisma.reserva.update({
-      where: { id },
-      data: { fin: new Date() },
+    return this.prisma.$transaction(async (tx) => {
+      const liberada = await tx.ocupacion.update({
+        where: { id },
+        data:  { liberadaAt: new Date() },
+        include: { areas: { include: { area: true } } },
+      });
+
+      const areaIds = oc.areas.map((r) => r.areaId);
+      await tx.area.updateMany({
+        where: { id: { in: areaIds } },
+        data:  { estado: AreaStatus.LIBRE },
+      });
+
+      return liberada;
     });
-
-    await this.prisma.area.update({
-      where: { id: reserva.areaId },
-      data: { estado: AreaStatus.LIBRE },
-    });
-
-    return finalizada;
   }
 
-  // ── REMOVE ────────────────────────────────────────────────────────────────
-  remove(id: number) {
-    return this.prisma.reserva.delete({ where: { id } });
+  // ── REMOVE ─────────────────────────────────────────────────────────────────
+  async remove(id: number) {
+    const oc = await this.findOne(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+      const removed = await tx.ocupacion.delete({ where: { id } });
+
+      const areaIds = oc.areas.map((r) => r.areaId);
+      await tx.area.updateMany({
+        where: { id: { in: areaIds } },
+        data:  { estado: AreaStatus.LIBRE },
+      });
+
+      return removed;
+    });
+  }
+
+  // ── helper: valida conflictos de horario excluyendo opcionalmente una oc ───
+  private async _validarConflictos(
+    areaIds: number[],
+    fechaDesdeDate: Date,
+    fechaHastaDate: Date,
+    horaDesde: string,
+    horaHasta: string,
+    excluirId?: number,
+  ) {
+    const existentes = await this.prisma.ocupacion.findMany({
+      where: {
+        liberadaAt: null,
+        areas: { some: { areaId: { in: areaIds } } },
+        ...(excluirId !== undefined && { id: { not: excluirId } }),
+      },
+      include: { areas: true },
+    });
+
+    const conflictivas = existentes.filter((oc) =>
+      rangosSolapan(
+        fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta,
+        oc.fechaDesde,  oc.fechaHasta,  oc.horaDesde, oc.horaHasta,
+      ),
+    );
+
+    if (conflictivas.length > 0) {
+      const areasConflicto = [
+        ...new Set(
+          conflictivas.flatMap((oc) =>
+            oc.areas
+              .filter((r) => areaIds.includes(r.areaId))
+              .map((r) => r.areaId),
+          ),
+        ),
+      ];
+      throw new BadRequestException(
+        `Conflicto de horario: las áreas [${areasConflicto.join(', ')}] ya están reservadas para la ocupación "${conflictivas[0].titulo}"`,
+      );
+    }
   }
 }
 EOF
-echo "  ✅  reserva.service.ts listo"
-
-# ── src/reserva/dto/update-reserva.dto.ts ────────────────────────────────────
-echo "📝  Actualizando update-reserva.dto.ts..."
-cat > src/reserva/dto/update-reserva.dto.ts << 'EOF'
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
-import { Recepcion } from '@prisma/client';
-
-export class UpdateReservaDto {
-  @ApiPropertyOptional({ description: 'Nombre del cliente' })
-  @IsOptional()
-  @IsString()
-  nombre?: string;
-
-  @ApiPropertyOptional({ description: 'Datos adicionales' })
-  @IsOptional()
-  @IsString()
-  detalles?: string;
-
-  @ApiPropertyOptional({ description: 'Nuevo ID de área (reasignación)' })
-  @IsOptional()
-  @IsInt()
-  areaId?: number;
-
-  @ApiPropertyOptional({
-    enum: Recepcion,
-    description: 'Turno de recepción: MANANA | INTERMEDIO | TARDE',
-  })
-  @IsOptional()
-  @IsEnum(Recepcion)
-  recepcion?: Recepcion;
-}
-EOF
-echo "  ✅  update-reserva.dto.ts listo"
+echo "  ✅  ocupacion.service.ts listo"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 echo ""
@@ -249,4 +330,4 @@ echo "🔨  Build de verificación..."
 pnpm build
 
 echo ""
-echo "✅  v28-back-editar-reserva completado"
+echo "✅  v29-back-editar-ocupacion completado"

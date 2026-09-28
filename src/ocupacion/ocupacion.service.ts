@@ -52,7 +52,6 @@ export class OcupacionService {
       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
     }
 
-    // Verificar que todas las áreas existen
     const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
     if (areas.length !== areaIds.length) {
       const encontrados = areas.map((a) => a.id);
@@ -60,39 +59,8 @@ export class OcupacionService {
       throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
     }
 
-    // Verificar conflictos de horario con ocupaciones activas
-    const existentes = await this.prisma.ocupacion.findMany({
-      where: {
-        liberadaAt: null,
-        areas: { some: { areaId: { in: areaIds } } },
-      },
-      include: { areas: true },
-    });
+    await this._validarConflictos(areaIds, fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta);
 
-    const conflictivas = existentes.filter((oc) =>
-      rangosSolapan(
-        fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta,
-        oc.fechaDesde,  oc.fechaHasta,  oc.horaDesde, oc.horaHasta,
-      ),
-    );
-
-    if (conflictivas.length > 0) {
-      const areasConflicto = [
-        ...new Set(
-          conflictivas.flatMap((oc) =>
-            oc.areas
-              .filter((r) => areaIds.includes(r.areaId))
-              .map((r) => r.areaId),
-          ),
-        ),
-      ];
-      const nombreConflicto = conflictivas[0].titulo;
-      throw new BadRequestException(
-        `Conflicto de horario: las áreas [${areasConflicto.join(', ')}] ya están reservadas para la ocupación "${nombreConflicto}"`,
-      );
-    }
-
-    // Crear ocupación y relaciones en una transacción
     return this.prisma.$transaction(async (tx) => {
       const ocupacion = await tx.ocupacion.create({
         data: {
@@ -102,14 +70,11 @@ export class OcupacionService {
           fechaHasta: fechaHastaDate,
           horaDesde,
           horaHasta,
-          areas: {
-            create: areaIds.map((areaId) => ({ areaId })),
-          },
+          areas: { create: areaIds.map((areaId) => ({ areaId })) },
         },
         include: { areas: { include: { area: true } } },
       });
 
-      // Marcar áreas como OCUPADO
       await tx.area.updateMany({
         where: { id: { in: areaIds } },
         data:  { estado: AreaStatus.OCUPADO },
@@ -132,10 +97,7 @@ export class OcupacionService {
     const hoy = new Date();
     hoy.setUTCHours(0, 0, 0, 0);
     return this.prisma.ocupacion.findMany({
-      where: {
-        liberadaAt: null,
-        fechaHasta: { gte: hoy },
-      },
+      where: { liberadaAt: null, fechaHasta: { gte: hoy } },
       orderBy: { fechaDesde: 'asc' },
       include: { areas: { include: { area: true } } },
     });
@@ -151,32 +113,113 @@ export class OcupacionService {
     return oc;
   }
 
-  // ── UPDATE ─────────────────────────────────────────────────────────────────
+  // ── UPDATE (completo) ──────────────────────────────────────────────────────
   async update(id: number, dto: UpdateOcupacionDto) {
-    await this.findOne(id);
+    const oc = await this.findOne(id);
 
-    const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
+    const {
+      areaIds,
+      fechaDesde,
+      fechaHasta,
+      horaDesde,
+      horaHasta,
+      telefono,
+      ...rest
+    } = dto;
 
-    const fechaDesdeDate = fechaDesde ? new Date(`${fechaDesde}T00:00:00.000Z`) : undefined;
-    const fechaHastaDate = fechaHasta ? new Date(`${fechaHasta}T00:00:00.000Z`) : undefined;
+    // Fechas efectivas (las nuevas o las actuales)
+    const fechaDesdeDate = fechaDesde
+      ? new Date(`${fechaDesde}T00:00:00.000Z`)
+      : oc.fechaDesde;
+    const fechaHastaDate = fechaHasta
+      ? new Date(`${fechaHasta}T00:00:00.000Z`)
+      : oc.fechaHasta;
 
-    return this.prisma.ocupacion.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(telefono !== undefined && { telefono }),
-        ...(fechaDesdeDate && { fechaDesde: fechaDesdeDate }),
-        ...(fechaHastaDate && { fechaHasta: fechaHastaDate }),
-        ...(horaDesde && { horaDesde }),
-        ...(horaHasta && { horaHasta }),
-        ...(areaIds && {
-          areas: {
-            deleteMany: {},
-            create: areaIds.map((areaId) => ({ areaId })),
-          },
-        }),
-      },
-      include: { areas: { include: { area: true } } },
+    const horaDesdeEfectiva = horaDesde ?? oc.horaDesde;
+    const horaHastaEfectiva = horaHasta ?? oc.horaHasta;
+
+    // Validar coherencia horaria
+    if (fechaDesdeDate > fechaHastaDate) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (timeToMinutes(horaDesdeEfectiva) >= timeToMinutes(horaHastaEfectiva)) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+    }
+
+    // IDs efectivos de áreas
+    const areaIdsEfectivos = areaIds ?? oc.areas.map((r) => r.areaId);
+
+    // Si cambian áreas o fechas/horas, revalidar conflictos excluyendo esta misma ocupación
+    const cambiaHorario =
+      areaIds !== undefined ||
+      fechaDesde !== undefined ||
+      fechaHasta !== undefined ||
+      horaDesde !== undefined ||
+      horaHasta !== undefined;
+
+    if (cambiaHorario) {
+      // Verificar que todas las áreas nuevas existen
+      if (areaIds !== undefined) {
+        const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+        if (areas.length !== areaIds.length) {
+          const faltantes = areaIds.filter((aid) => !areas.find((a) => a.id === aid));
+          throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
+        }
+      }
+
+      await this._validarConflictos(
+        areaIdsEfectivos,
+        fechaDesdeDate,
+        fechaHastaDate,
+        horaDesdeEfectiva,
+        horaHastaEfectiva,
+        id, // excluir la ocupación actual
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Si cambian las áreas: liberar las viejas y ocupar las nuevas
+      if (areaIds !== undefined) {
+        const viejasIds = oc.areas.map((r) => r.areaId);
+        const nuevasIds = areaIds;
+
+        const liberadas = viejasIds.filter((aid) => !nuevasIds.includes(aid));
+        const agregadas = nuevasIds.filter((aid) => !viejasIds.includes(aid));
+
+        if (liberadas.length > 0) {
+          await tx.area.updateMany({
+            where: { id: { in: liberadas } },
+            data:  { estado: AreaStatus.LIBRE },
+          });
+        }
+        if (agregadas.length > 0) {
+          await tx.area.updateMany({
+            where: { id: { in: agregadas } },
+            data:  { estado: AreaStatus.OCUPADO },
+          });
+        }
+      }
+
+      const actualizada = await tx.ocupacion.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(telefono !== undefined && { telefono: telefono || null }),
+          fechaDesde: fechaDesdeDate,
+          fechaHasta: fechaHastaDate,
+          horaDesde:  horaDesdeEfectiva,
+          horaHasta:  horaHastaEfectiva,
+          ...(areaIds !== undefined && {
+            areas: {
+              deleteMany: {},
+              create: areaIds.map((areaId) => ({ areaId })),
+            },
+          }),
+        },
+        include: { areas: { include: { area: true } } },
+      });
+
+      return actualizada;
     });
   }
 
@@ -207,7 +250,6 @@ export class OcupacionService {
 
     return this.prisma.$transaction(async (tx) => {
       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-
       const removed = await tx.ocupacion.delete({ where: { id } });
 
       const areaIds = oc.areas.map((r) => r.areaId);
@@ -218,5 +260,46 @@ export class OcupacionService {
 
       return removed;
     });
+  }
+
+  // ── helper: valida conflictos de horario excluyendo opcionalmente una oc ───
+  private async _validarConflictos(
+    areaIds: number[],
+    fechaDesdeDate: Date,
+    fechaHastaDate: Date,
+    horaDesde: string,
+    horaHasta: string,
+    excluirId?: number,
+  ) {
+    const existentes = await this.prisma.ocupacion.findMany({
+      where: {
+        liberadaAt: null,
+        areas: { some: { areaId: { in: areaIds } } },
+        ...(excluirId !== undefined && { id: { not: excluirId } }),
+      },
+      include: { areas: true },
+    });
+
+    const conflictivas = existentes.filter((oc) =>
+      rangosSolapan(
+        fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta,
+        oc.fechaDesde,  oc.fechaHasta,  oc.horaDesde, oc.horaHasta,
+      ),
+    );
+
+    if (conflictivas.length > 0) {
+      const areasConflicto = [
+        ...new Set(
+          conflictivas.flatMap((oc) =>
+            oc.areas
+              .filter((r) => areaIds.includes(r.areaId))
+              .map((r) => r.areaId),
+          ),
+        ),
+      ];
+      throw new BadRequestException(
+        `Conflicto de horario: las áreas [${areasConflicto.join(', ')}] ya están reservadas para la ocupación "${conflictivas[0].titulo}"`,
+      );
+    }
   }
 }
