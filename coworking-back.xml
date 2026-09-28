@@ -526,21 +526,36 @@ x.sh
 
 ## File: src/reserva/dto/create-reserva.dto.ts
 ````typescript
- 1: import { ApiProperty } from '@nestjs/swagger';
- 2: 
- 3: export class CreateReservaDto {
- 4:   @ApiProperty()
- 5:   nombre: string;
- 6: 
- 7:   @ApiProperty({ required: false })
- 8:   detalles?: string;
+ 1: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ 2: import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+ 3: import { Recepcion } from '@prisma/client';
+ 4: 
+ 5: export class CreateReservaDto {
+ 6:   @ApiProperty({ description: 'Nombre del cliente que reserva' })
+ 7:   @IsString()
+ 8:   nombre: string;
  9: 
-10:   @ApiProperty()
-11:   usuarioId: number;
-12: 
-13:   @ApiProperty()
-14:   areaId: number;
-15: }
+10:   @ApiPropertyOptional({ description: 'Datos adicionales de la reserva' })
+11:   @IsOptional()
+12:   @IsString()
+13:   detalles?: string;
+14: 
+15:   @ApiProperty({ description: 'ID del usuario' })
+16:   @IsInt()
+17:   usuarioId: number;
+18: 
+19:   @ApiProperty({ description: 'ID del área a reservar' })
+20:   @IsInt()
+21:   areaId: number;
+22: 
+23:   @ApiPropertyOptional({
+24:     enum: Recepcion,
+25:     description: 'Turno de recepción: MANANA | INTERMEDIO | TARDE',
+26:   })
+27:   @IsOptional()
+28:   @IsEnum(Recepcion)
+29:   recepcion?: Recepcion;
+30: }
 ````
 
 ## File: src/reserva/dto/update-reserva.dto.ts
@@ -1374,97 +1389,6 @@ x.sh
 51: }
 ````
 
-## File: src/ocupacion/dto/create-ocupacion.dto.ts
-````typescript
- 1: import {
- 2:   IsString,
- 3:   IsOptional,
- 4:   IsInt,
- 5:   IsArray,
- 6:   IsUrl,
- 7:   IsDateString,
- 8:   Matches,
- 9:   Min,
-10:   Max,
-11:   MinLength,
-12:   ArrayMinSize,
-13:   ArrayMaxSize,
-14: } from 'class-validator';
-15: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-16: import { Type } from 'class-transformer';
-17: 
-18: export class CreateOcupacionDto {
-19:   @ApiProperty({ description: 'Título del evento / ocupación' })
-20:   @IsString()
-21:   @MinLength(3)
-22:   titulo: string;
-23: 
-24:   @ApiProperty({ description: 'Requerimientos o descripción' })
-25:   @IsString()
-26:   @MinLength(3)
-27:   requerimiento: string;
-28: 
-29:   @ApiProperty({ description: 'Cantidad estimada de personas' })
-30:   @Type(() => Number)
-31:   @IsInt()
-32:   @Min(1)
-33:   cantidadPersonas: number;
-34: 
-35:   @ApiProperty({ description: 'Nombre del organizador / solicitante' })
-36:   @IsString()
-37:   @MinLength(2)
-38:   organizador: string;
-39: 
-40:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
-41:   @IsDateString()
-42:   fechaDesde: string;
-43: 
-44:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
-45:   @IsDateString()
-46:   fechaHasta: string;
-47: 
-48:   @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
-49:   @IsString()
-50:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
-51:   horaDesde: string;
-52: 
-53:   @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
-54:   @IsString()
-55:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
-56:   horaHasta: string;
-57: 
-58:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
-59:   @IsOptional()
-60:   @Type(() => Number)
-61:   @IsInt()
-62:   @Min(0)
-63:   @Max(120)
-64:   edadMin?: number;
-65: 
-66:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
-67:   @IsOptional()
-68:   @Type(() => Number)
-69:   @IsInt()
-70:   @Min(0)
-71:   @Max(120)
-72:   edadMax?: number;
-73: 
-74:   @ApiPropertyOptional({ description: 'URLs de anexos', type: [String] })
-75:   @IsOptional()
-76:   @IsArray()
-77:   @IsUrl({}, { each: true })
-78:   @ArrayMaxSize(10)
-79:   anexos?: string[];
-80: 
-81:   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
-82:   @IsArray()
-83:   @ArrayMinSize(1)
-84:   @Type(() => Number)
-85:   @IsInt({ each: true })
-86:   areaIds: number[];
-87: }
-````
-
 ## File: src/ocupacion/dto/update-ocupacion.dto.ts
 ````typescript
 1: import { PartialType } from '@nestjs/swagger';
@@ -1625,64 +1549,59 @@ x.sh
  72:     if (area.estado !== AreaStatus.LIBRE)
  73:       throw new BadRequestException('El área no está disponible');
  74: 
- 75:     // Nuevo: valida contra Ocupaciones (día + rango horario), no solo el AreaStatus
- 76:     await this.verificarOcupacionActiva(data.areaId);
- 77: 
- 78:     // Crear la reserva
- 79:     const reserva = await this.prisma.reserva.create({ data });
- 80: 
- 81:     // Cambiar estado del área a OCUPADO
- 82:     await this.prisma.area.update({
- 83:       where: { id: data.areaId },
- 84:       data: { estado: AreaStatus.OCUPADO },
- 85:     });
+ 75:     await this.verificarOcupacionActiva(data.areaId);
+ 76: 
+ 77:     const reserva = await this.prisma.reserva.create({ data });
+ 78: 
+ 79:     await this.prisma.area.update({
+ 80:       where: { id: data.areaId },
+ 81:       data: { estado: AreaStatus.OCUPADO },
+ 82:     });
+ 83: 
+ 84:     return reserva;
+ 85:   }
  86: 
- 87:     return reserva;
- 88:   }
- 89: 
- 90:   findAll() {
- 91:     return this.prisma.reserva.findMany({
- 92:       include: { usuario: true, area: true },
- 93:     });
- 94:   }
- 95: 
- 96:   findOne(id: number) {
- 97:     return this.prisma.reserva.findUnique({
- 98:       where: { id },
- 99:       include: { usuario: true, area: true },
-100:     });
-101:   }
-102: 
-103:   update(id: number, data: UpdateReservaDto) {
-104:     return this.prisma.reserva.update({
-105:       where: { id },
-106:       data,
-107:     });
-108:   }
-109: 
-110:   async completarReserva(id: number) {
-111:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
-112:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
-113: 
-114:     // Finalizar reserva
-115:     const finalizada = await this.prisma.reserva.update({
-116:       where: { id },
-117:       data: { fin: new Date() },
-118:     });
-119: 
-120:     // Restaurar área a "LIBRE"
-121:     await this.prisma.area.update({
-122:       where: { id: reserva.areaId },
-123:       data: { estado: AreaStatus.LIBRE },
-124:     });
-125: 
-126:     return finalizada;
-127:   }
-128: 
-129:   remove(id: number) {
-130:     return this.prisma.reserva.delete({ where: { id } });
-131:   }
-132: }
+ 87:   findAll() {
+ 88:     return this.prisma.reserva.findMany({
+ 89:       include: { usuario: true, area: true },
+ 90:     });
+ 91:   }
+ 92: 
+ 93:   findOne(id: number) {
+ 94:     return this.prisma.reserva.findUnique({
+ 95:       where: { id },
+ 96:       include: { usuario: true, area: true },
+ 97:     });
+ 98:   }
+ 99: 
+100:   update(id: number, data: UpdateReservaDto) {
+101:     return this.prisma.reserva.update({
+102:       where: { id },
+103:       data,
+104:     });
+105:   }
+106: 
+107:   async completarReserva(id: number) {
+108:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
+109:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+110: 
+111:     const finalizada = await this.prisma.reserva.update({
+112:       where: { id },
+113:       data: { fin: new Date() },
+114:     });
+115: 
+116:     await this.prisma.area.update({
+117:       where: { id: reserva.areaId },
+118:       data: { estado: AreaStatus.LIBRE },
+119:     });
+120: 
+121:     return finalizada;
+122:   }
+123: 
+124:   remove(id: number) {
+125:     return this.prisma.reserva.delete({ where: { id } });
+126:   }
+127: }
 ````
 
 ## File: .gitignore
@@ -1859,876 +1778,326 @@ x.sh
 74: }
 ````
 
+## File: src/ocupacion/dto/create-ocupacion.dto.ts
+````typescript
+ 1: import {
+ 2:   IsString,
+ 3:   IsOptional,
+ 4:   IsInt,
+ 5:   IsArray,
+ 6:   IsUrl,
+ 7:   IsDateString,
+ 8:   Matches,
+ 9:   Min,
+10:   Max,
+11:   MinLength,
+12:   ArrayMinSize,
+13:   ArrayMaxSize,
+14: } from 'class-validator';
+15: import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+16: import { Type } from 'class-transformer';
+17: 
+18: export class CreateOcupacionDto {
+19:   @ApiProperty({ description: 'Título del evento / ocupación' })
+20:   @IsString()
+21:   @MinLength(3)
+22:   titulo: string;
+23: 
+24:   @ApiProperty({ description: 'Requerimientos o descripción' })
+25:   @IsString()
+26:   @MinLength(3)
+27:   requerimiento: string;
+28: 
+29:   @ApiProperty({ description: 'Cantidad estimada de personas' })
+30:   @Type(() => Number)
+31:   @IsInt()
+32:   @Min(1)
+33:   cantidadPersonas: number;
+34: 
+35:   @ApiProperty({ description: 'Nombre del organizador / solicitante' })
+36:   @IsString()
+37:   @MinLength(2)
+38:   organizador: string;
+39: 
+40:   @ApiPropertyOptional({ description: 'Teléfono de contacto del organizador' })
+41:   @IsOptional()
+42:   @IsString()
+43:   telefono?: string;
+44: 
+45:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
+46:   @IsDateString()
+47:   fechaDesde: string;
+48: 
+49:   @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
+50:   @IsDateString()
+51:   fechaHasta: string;
+52: 
+53:   @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
+54:   @IsString()
+55:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
+56:   horaDesde: string;
+57: 
+58:   @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
+59:   @IsString()
+60:   @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
+61:   horaHasta: string;
+62: 
+63:   @ApiPropertyOptional({ description: 'Edad mínima del público' })
+64:   @IsOptional()
+65:   @Type(() => Number)
+66:   @IsInt()
+67:   @Min(0)
+68:   @Max(120)
+69:   edadMin?: number;
+70: 
+71:   @ApiPropertyOptional({ description: 'Edad máxima del público' })
+72:   @IsOptional()
+73:   @Type(() => Number)
+74:   @IsInt()
+75:   @Min(0)
+76:   @Max(120)
+77:   edadMax?: number;
+78: 
+79:   @ApiPropertyOptional({ description: 'URLs de anexos / documentos', type: [String] })
+80:   @IsOptional()
+81:   @IsArray()
+82:   @ArrayMaxSize(10)
+83:   @IsUrl({}, { each: true })
+84:   anexos?: string[];
+85: 
+86:   @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
+87:   @IsArray()
+88:   @ArrayMinSize(1)
+89:   @Type(() => Number)
+90:   @IsInt({ each: true })
+91:   areaIds: number[];
+92: }
+````
+
 ## File: src/ocupacion/ocupacion.service.ts
 ````typescript
   1: import {
   2:   Injectable,
-  3:   NotFoundException,
-  4:   BadRequestException,
-  5:   Logger,
-  6: } from '@nestjs/common';
-  7: import { Cron } from '@nestjs/schedule';
-  8: import { PrismaService } from 'prisma/prisma.service';
-  9: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
- 10: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
- 11: import { AreaStatus } from '@prisma/client';
- 12: 
- 13: // ── Helpers de tiempo ─────────────────────────────────────────────────────────
- 14: 
- 15: function timeToMinutes(hhmm: string): number {
- 16:   const [h, m] = hhmm.split(':').map(Number);
- 17:   return h * 60 + m;
- 18: }
- 19: 
- 20: /**
- 21:  * Fecha local Argentina como YYYY-MM-DD (UTC-3).
- 22:  * Usa Intl.DateTimeFormat (inmutable) en lugar de setHours() mutable,
- 23:  * que era la causa del bug en findActivas().
- 24:  */
- 25: function hoyArgentina(): string {
- 26:   return new Intl.DateTimeFormat('es-AR', {
- 27:     timeZone: 'America/Argentina/Buenos_Aires',
- 28:     year:     'numeric',
- 29:     month:    '2-digit',
- 30:     day:      '2-digit',
- 31:   })
- 32:     .format(new Date())
- 33:     .split('/')               // dd/mm/yyyy
- 34:     .reverse()                // yyyy, mm, dd
- 35:     .join('-');               // yyyy-mm-dd
- 36: }
- 37: 
- 38: @Injectable()
- 39: export class OcupacionService {
- 40:   private readonly logger = new Logger(OcupacionService.name);
- 41: 
- 42:   constructor(private readonly prisma: PrismaService) {}
- 43: 
- 44:   // ── Verifica conflicto de horario para un área ────────────────────────────
- 45:   private async verificarConflicto(
- 46:     areaIds: number[],
- 47:     fechaDesde: string,
- 48:     fechaHasta: string,
- 49:     horaDesde: string,
- 50:     horaHasta: string,
- 51:     excludeId?: number,
- 52:   ): Promise<void> {
- 53:     const ocupacionesActivas = await this.prisma.ocupacion.findMany({
- 54:       where: {
- 55:         liberadaAt: null,
- 56:         ...(excludeId ? { id: { not: excludeId } } : {}),
- 57:         areas: { some: { areaId: { in: areaIds } } },
- 58:         AND: [
- 59:           { fechaDesde: { lte: new Date(`${fechaHasta}T23:59:59.000Z`) } },
- 60:           { fechaHasta: { gte: new Date(`${fechaDesde}T00:00:00.000Z`) } },
- 61:         ],
- 62:       },
- 63:       include: { areas: { include: { area: true } } },
- 64:     });
- 65: 
- 66:     const nuevaInicio = timeToMinutes(horaDesde);
- 67:     const nuevaFin    = timeToMinutes(horaHasta);
- 68: 
- 69:     for (const oc of ocupacionesActivas) {
- 70:       const existInicio = timeToMinutes(oc.horaDesde);
- 71:       const existFin    = timeToMinutes(oc.horaHasta);
- 72:       const solapan     = nuevaInicio < existFin && nuevaFin > existInicio;
- 73:       if (!solapan) continue;
- 74: 
- 75:       const areasConflicto = oc.areas
- 76:         .filter((r) => areaIds.includes(r.areaId))
- 77:         .map((r) => r.area.nombre)
- 78:         .join(', ');
- 79: 
- 80:       throw new BadRequestException(
- 81:         `Conflicto de horario: las áreas [${areasConflicto}] ya están ocupadas ` +
- 82:         `el ${oc.fechaDesde.toISOString().split('T')[0]} de ${oc.horaDesde} a ${oc.horaHasta} ` +
- 83:         `(ocupación "${oc.titulo}")`,
- 84:       );
- 85:     }
- 86:   }
- 87: 
- 88:   // ── CREATE ────────────────────────────────────────────────────────────────
- 89:   async create(dto: CreateOcupacionDto) {
- 90:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
- 91:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
- 92:     }
- 93:     if (dto.fechaDesde > dto.fechaHasta) {
- 94:       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
- 95:     }
- 96:     if (dto.fechaDesde === dto.fechaHasta && dto.horaDesde >= dto.horaHasta) {
- 97:       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
- 98:     }
- 99: 
-100:     const areas = await this.prisma.area.findMany({ where: { id: { in: dto.areaIds } } });
-101:     if (areas.length !== dto.areaIds.length) {
-102:       const missing = dto.areaIds.filter((id) => !areas.map((a) => a.id).includes(id));
-103:       throw new NotFoundException(`Área(s) no encontrada(s): ${missing.join(', ')}`);
-104:     }
-105: 
-106:     await this.verificarConflicto(dto.areaIds, dto.fechaDesde, dto.fechaHasta, dto.horaDesde, dto.horaHasta);
-107: 
-108:     const ocupacion = await this.prisma.$transaction(async (tx) => {
-109:       const nueva = await tx.ocupacion.create({
-110:         data: {
-111:           titulo:           dto.titulo,
-112:           requerimiento:    dto.requerimiento,
-113:           cantidadPersonas: dto.cantidadPersonas,
-114:           organizador:      dto.organizador,
-115:           fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`),
-116:           fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`),
-117:           horaDesde:        dto.horaDesde,
-118:           horaHasta:        dto.horaHasta,
-119:           edadMin:          dto.edadMin,
-120:           edadMax:          dto.edadMax,
-121:           anexos:           dto.anexos ?? [],
-122:           areas: { create: dto.areaIds.map((areaId) => ({ areaId })) },
-123:         },
-124:         include: { areas: { include: { area: true } } },
-125:       });
-126: 
-127:       await tx.area.updateMany({
-128:         where: { id: { in: dto.areaIds } },
-129:         data:  { estado: AreaStatus.OCUPADO },
-130:       });
-131: 
-132:       return nueva;
-133:     });
-134: 
-135:     return ocupacion;
-136:   }
-137: 
-138:   // ── FIND ALL ──────────────────────────────────────────────────────────────
-139:   findAll() {
-140:     return this.prisma.ocupacion.findMany({
-141:       orderBy: { fechaDesde: 'asc' },
-142:       include: { areas: { include: { area: true } } },
-143:     });
-144:   }
-145: 
-146:   // ── FIND ACTIVAS (sin liberadaAt, fechaHasta >= hoy Argentina) ────────────
-147:   findActivas() {
-148:     // hoyArgentina() ahora usa Intl.DateTimeFormat — no más bug de setHours()
-149:     const hoy = hoyArgentina();
-150:     return this.prisma.ocupacion.findMany({
-151:       where: {
-152:         liberadaAt: null,
-153:         fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
-154:       },
-155:       orderBy: { fechaDesde: 'asc' },
-156:       include: { areas: { include: { area: true } } },
-157:     });
-158:   }
-159: 
-160:   // ── FIND ONE ──────────────────────────────────────────────────────────────
-161:   async findOne(id: number) {
-162:     const ocupacion = await this.prisma.ocupacion.findUnique({
-163:       where: { id },
-164:       include: { areas: { include: { area: true } } },
-165:     });
-166:     if (!ocupacion) throw new NotFoundException(`Ocupación ${id} no encontrada`);
-167:     return ocupacion;
-168:   }
-169: 
-170:   // ── UPDATE ────────────────────────────────────────────────────────────────
-171:   async update(id: number, dto: UpdateOcupacionDto) {
-172:     const actual = await this.findOne(id);
-173: 
-174:     if (dto.edadMin !== undefined && dto.edadMax !== undefined && dto.edadMin > dto.edadMax) {
-175:       throw new BadRequestException('edadMin no puede ser mayor que edadMax');
-176:     }
-177: 
-178:     const fechaDesde = dto.fechaDesde ?? actual.fechaDesde.toISOString().split('T')[0];
-179:     const fechaHasta = dto.fechaHasta ?? actual.fechaHasta.toISOString().split('T')[0];
-180:     const horaDesde  = dto.horaDesde  ?? actual.horaDesde;
-181:     const horaHasta  = dto.horaHasta  ?? actual.horaHasta;
-182:     const areaIds    = dto.areaIds    ?? actual.areas.map((r: { areaId: number }) => r.areaId);
-183: 
-184:     await this.verificarConflicto(areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, id);
-185: 
-186:     return this.prisma.ocupacion.update({
-187:       where: { id },
-188:       data: {
-189:         ...(dto.titulo           !== undefined && { titulo:           dto.titulo }),
-190:         ...(dto.requerimiento    !== undefined && { requerimiento:    dto.requerimiento }),
-191:         ...(dto.cantidadPersonas !== undefined && { cantidadPersonas: dto.cantidadPersonas }),
-192:         ...(dto.organizador      !== undefined && { organizador:      dto.organizador }),
-193:         ...(dto.fechaDesde       !== undefined && { fechaDesde:       new Date(`${dto.fechaDesde}T00:00:00.000Z`) }),
-194:         ...(dto.fechaHasta       !== undefined && { fechaHasta:       new Date(`${dto.fechaHasta}T23:59:59.000Z`) }),
-195:         ...(dto.horaDesde        !== undefined && { horaDesde:        dto.horaDesde }),
-196:         ...(dto.horaHasta        !== undefined && { horaHasta:        dto.horaHasta }),
-197:         ...(dto.edadMin          !== undefined && { edadMin:          dto.edadMin }),
-198:         ...(dto.edadMax          !== undefined && { edadMax:          dto.edadMax }),
-199:         ...(dto.anexos           !== undefined && { anexos:           dto.anexos }),
-200:       },
-201:       include: { areas: { include: { area: true } } },
-202:     });
-203:   }
-204: 
-205:   // ── LIBERAR ───────────────────────────────────────────────────────────────
-206:   async liberar(id: number) {
-207:     const ocupacion = await this.findOne(id);
-208:     const areaIds   = ocupacion.areas.map((r: { areaId: number }) => r.areaId);
-209: 
-210:     return this.prisma.$transaction(async (tx) => {
-211:       if (areaIds.length > 0) {
-212:         await tx.area.updateMany({
-213:           where: { id: { in: areaIds } },
-214:           data:  { estado: AreaStatus.LIBRE },
-215:         });
-216:       }
-217:       return tx.ocupacion.update({
-218:         where: { id },
-219:         data:  { liberadaAt: new Date() },
-220:         include: { areas: { include: { area: true } } },
-221:       });
-222:     });
-223:   }
-224: 
-225:   // ── DELETE ────────────────────────────────────────────────────────────────
-226:   async remove(id: number) {
-227:     const ocupacion = await this.findOne(id);
-228:     const areaIds   = ocupacion.areas.map((r: { areaId: number }) => r.areaId);
-229: 
-230:     await this.prisma.$transaction(async (tx) => {
-231:       if (areaIds.length > 0) {
-232:         await tx.area.updateMany({
-233:           where: { id: { in: areaIds } },
-234:           data:  { estado: AreaStatus.LIBRE },
-235:         });
-236:       }
-237:       await tx.ocupacion.delete({ where: { id } });
-238:     });
-239:   }
-240: 
-241:   // ── AUTO-LIBERAR (cron cada minuto) ───────────────────────────────────────
-242:   @Cron('*/5 * * * *')
-243:   async autoLiberarVencidas() {
-244:     const ahora      = new Date();
-245:     // UTC-3 inmutable
-246:     const ahoraUTC3  = new Date(ahora.getTime() - 3 * 60 * 60 * 1000);
-247:     const fechaHoy   = ahoraUTC3.toISOString().split('T')[0];
-248:     const minutosNow = ahoraUTC3.getUTCHours() * 60 + ahoraUTC3.getUTCMinutes();
-249: 
-250:     try {
-251:       const candidatas = await this.prisma.ocupacion.findMany({
-252:         where: {
-253:           liberadaAt: null,
-254:           fechaHasta: { lte: new Date(`${fechaHoy}T23:59:59.000Z`) },
-255:         },
-256:         include: { areas: { include: { area: true } } },
-257:       });
-258: 
-259:       for (const oc of candidatas) {
-260:         const fechaFin = oc.fechaHasta.toISOString().split('T')[0];
-261: 
-262:         if (fechaFin < fechaHoy) {
-263:           await this.liberarInterno(oc);
-264:           continue;
-265:         }
-266: 
-267:         if (fechaFin === fechaHoy) {
-268:           const minutosFin = timeToMinutes(oc.horaHasta);
-269:           if (minutosNow >= minutosFin) {
-270:             await this.liberarInterno(oc);
-271:           }
-272:         }
-273:       }
-274:     } catch (err) {
-275:       this.logger.error('Error en autoLiberarVencidas:', (err as Error).message);
-276:     }
-277:   }
-278: 
-279:   private async liberarInterno(oc: { id: number; areas: { areaId: number }[] }) {
-280:     const areaIds = oc.areas.map((r) => r.areaId);
-281:     await this.prisma.$transaction(async (tx) => {
-282:       if (areaIds.length > 0) {
-283:         await tx.area.updateMany({
-284:           where: { id: { in: areaIds } },
-285:           data:  { estado: AreaStatus.LIBRE },
-286:         });
-287:       }
-288:       await tx.ocupacion.update({
-289:         where: { id: oc.id },
-290:         data:  { liberadaAt: new Date() },
-291:       });
-292:     });
-293:     this.logger.log(`⏰ Auto-liberada ocupación ${oc.id}`);
-294:   }
-295: }
-````
-
-## File: x.sh
-````bash
-  1: #!/usr/bin/env bash
-  2: # ============================================================================
-  3: #  v17-fix-too-many-connections.sh
-  4: #
-  5: #  Problema: P2037 "Too many connections" en PostgreSQL.
-  6: #  Causas combinadas:
-  7: #    BACK: pg.Pool sin max configurado → abre hasta el límite de PG (100)
-  8: #          El cron cada minuto + requests concurrentes saturan la DB.
-  9: #    FRONT: fetchSeats disparado en loop por useCallback sin deps estables
- 10: #           → polling descontrolado con decenas de requests/segundo.
- 11: #
- 12: #  Fixes BACKEND (coworking-back):
- 13: #    · prisma/prisma.service.ts → pg.Pool con max:10, idleTimeoutMillis,
- 14: #      connectionTimeoutMillis
- 15: #    · src/ocupacion/ocupacion.service.ts → cron cada 5 min en vez de 1 min
- 16: #
- 17: #  Fixes FRONTEND (coworking-front):
- 18: #    · hooks/use-seats.ts → fetchSeats con useCallback sin deps + polling
- 19: #      cada 30s en vez de en cada render
- 20: #    · app/page.tsx → useEffect con [] para fetchSeats inicial (sin deps)
- 21: #
- 22: #  El script detecta en qué repo estás y aplica solo lo que corresponde.
- 23: #
- 24: #  Uso:
- 25: #    cd coworking-back  → chmod +x v17... && ./v17...
- 26: #    cd coworking-front → chmod +x v17... && ./v17...
- 27: # ============================================================================
- 28: set -euo pipefail
- 29: 
- 30: IS_BACK=false
- 31: IS_FRONT=false
+  3:   BadRequestException,
+  4:   NotFoundException,
+  5: } from '@nestjs/common';
+  6: import { PrismaService } from 'prisma/prisma.service';
+  7: import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+  8: import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
+  9: import { AreaStatus } from '@prisma/client';
+ 10: 
+ 11: // ── helpers ──────────────────────────────────────────────────────────────────
+ 12: function timeToMinutes(hhmm: string): number {
+ 13:   const [h, m] = hhmm.split(':').map(Number);
+ 14:   return h * 60 + m;
+ 15: }
+ 16: 
+ 17: function rangosSolapan(
+ 18:   aDesde: Date, aHasta: Date, aHoraDesde: string, aHoraHasta: string,
+ 19:   bDesde: Date, bHasta: Date, bHoraDesde: string, bHoraHasta: string,
+ 20: ): boolean {
+ 21:   const aD = aDesde.toISOString().split('T')[0];
+ 22:   const aH = aHasta.toISOString().split('T')[0];
+ 23:   const bD = bDesde.toISOString().split('T')[0];
+ 24:   const bH = bHasta.toISOString().split('T')[0];
+ 25: 
+ 26:   if (aD > bH || aH < bD) return false;
+ 27: 
+ 28:   const aDesdeMin = timeToMinutes(aHoraDesde);
+ 29:   const aHastaMin = timeToMinutes(aHoraHasta);
+ 30:   const bDesdeMin = timeToMinutes(bHoraDesde);
+ 31:   const bHastaMin = timeToMinutes(bHoraHasta);
  32: 
- 33: if [ -f "package.json" ] && [ -d "src" ] && grep -q "nestjs" package.json 2>/dev/null; then
- 34:   IS_BACK=true
- 35: fi
- 36: if [ -f "package.json" ] && [ -d "app" ] && grep -q "next" package.json 2>/dev/null; then
- 37:   IS_FRONT=true
- 38: fi
- 39: 
- 40: if [ "$IS_BACK" = false ] && [ "$IS_FRONT" = false ]; then
- 41:   echo "❌  No se reconoce el proyecto. Corré desde coworking-back o coworking-front."
- 42:   exit 1
- 43: fi
+ 33:   return aDesdeMin < bHastaMin && aHastaMin > bDesdeMin;
+ 34: }
+ 35: 
+ 36: // ── service ──────────────────────────────────────────────────────────────────
+ 37: @Injectable()
+ 38: export class OcupacionService {
+ 39:   constructor(private prisma: PrismaService) {}
+ 40: 
+ 41:   // ── CREATE ─────────────────────────────────────────────────────────────────
+ 42:   async create(dto: CreateOcupacionDto) {
+ 43:     const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
  44: 
- 45: echo ""
- 46: echo "╔══════════════════════════════════════════════════════════════════╗"
- 47: echo "║  🔧  v17 — Fix Too Many Connections                             ║"
- 48: echo "╚══════════════════════════════════════════════════════════════════╝"
- 49: 
- 50: # ════════════════════════════════════════════════════════════════════════════
- 51: # BACKEND
- 52: # ════════════════════════════════════════════════════════════════════════════
- 53: if [ "$IS_BACK" = true ]; then
- 54:   echo ""
- 55:   echo "── BACKEND ──────────────────────────────────────────────────────────"
- 56: 
- 57:   # ── prisma/prisma.service.ts — pool limitado ────────────────────────────
- 58:   echo "📄  prisma/prisma.service.ts..."
- 59:   cat > prisma/prisma.service.ts << 'EOF'
- 60: import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
- 61: import { PrismaClient } from '@prisma/client';
- 62: import { PrismaPg } from '@prisma/adapter-pg';
- 63: import * as pg from 'pg';
- 64: 
- 65: @Injectable()
- 66: export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
- 67:   private readonly logger = new Logger(PrismaService.name);
- 68:   private readonly pool: pg.Pool;
- 69: 
- 70:   constructor() {
- 71:     const connectionString = process.env.DATABASE_URL;
- 72: 
- 73:     // Pool con límite explícito — evita saturar PostgreSQL
- 74:     const pool = new pg.Pool({
- 75:       connectionString,
- 76:       max:                    10,   // máximo 10 conexiones simultáneas
- 77:       idleTimeoutMillis:   30_000, // libera conexiones inactivas a los 30s
- 78:       connectionTimeoutMillis: 5_000, // error si no consigue conexión en 5s
- 79:     });
- 80: 
- 81:     pool.on('error', (err) => {
- 82:       // Log del error pero sin crashear la app
- 83:       console.error('[PrismaService] Pool error:', err.message);
- 84:     });
- 85: 
- 86:     const adapter = new PrismaPg(pool);
- 87: 
- 88:     super({ adapter });
- 89: 
- 90:     // Guardar referencia para destruir el pool al apagar
- 91:     this.pool = pool;
- 92:   }
- 93: 
- 94:   async onModuleInit() {
- 95:     await this.$connect();
- 96:     this.logger.log('Prisma conectado (pool max=10)');
- 97:   }
- 98: 
- 99:   async onModuleDestroy() {
-100:     await this.$disconnect();
-101:     await this.pool.end();
-102:     this.logger.log('Prisma desconectado');
-103:   }
-104: }
-105: EOF
-106:   echo "✅  prisma/prisma.service.ts — pool max=10"
-107: 
-108:   # ── src/ocupacion/ocupacion.service.ts — cron cada 5 min ───────────────
-109:   echo "📄  src/ocupacion/ocupacion.service.ts — cron cada 5 min..."
-110:   # Reemplazar @Cron('* * * * *') por @Cron('*/5 * * * *')
-111:   sed -i "s|@Cron('\\* \\* \\* \\* \\*')|@Cron('*/5 * * * *')|g" src/ocupacion/ocupacion.service.ts
-112:   echo "✅  Cron: cada minuto → cada 5 minutos"
-113: 
-114:   echo ""
-115:   echo "🔨  Compilando backend..."
-116:   pnpm build
+ 45:     const fechaDesdeDate = new Date(`${fechaDesde}T00:00:00.000Z`);
+ 46:     const fechaHastaDate = new Date(`${fechaHasta}T00:00:00.000Z`);
+ 47: 
+ 48:     if (fechaDesdeDate > fechaHastaDate) {
+ 49:       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+ 50:     }
+ 51:     if (timeToMinutes(horaDesde) >= timeToMinutes(horaHasta)) {
+ 52:       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+ 53:     }
+ 54: 
+ 55:     // Verificar que todas las áreas existen
+ 56:     const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+ 57:     if (areas.length !== areaIds.length) {
+ 58:       const encontrados = areas.map((a) => a.id);
+ 59:       const faltantes   = areaIds.filter((id) => !encontrados.includes(id));
+ 60:       throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
+ 61:     }
+ 62: 
+ 63:     // Verificar conflictos de horario con ocupaciones activas
+ 64:     const existentes = await this.prisma.ocupacion.findMany({
+ 65:       where: {
+ 66:         liberadaAt: null,
+ 67:         areas: { some: { areaId: { in: areaIds } } },
+ 68:       },
+ 69:       include: { areas: true },
+ 70:     });
+ 71: 
+ 72:     const conflictivas = existentes.filter((oc) =>
+ 73:       rangosSolapan(
+ 74:         fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta,
+ 75:         oc.fechaDesde,  oc.fechaHasta,  oc.horaDesde, oc.horaHasta,
+ 76:       ),
+ 77:     );
+ 78: 
+ 79:     if (conflictivas.length > 0) {
+ 80:       const areasConflicto = [
+ 81:         ...new Set(
+ 82:           conflictivas.flatMap((oc) =>
+ 83:             oc.areas
+ 84:               .filter((r) => areaIds.includes(r.areaId))
+ 85:               .map((r) => r.areaId),
+ 86:           ),
+ 87:         ),
+ 88:       ];
+ 89:       const nombreConflicto = conflictivas[0].titulo;
+ 90:       throw new BadRequestException(
+ 91:         `Conflicto de horario: las áreas [${areasConflicto.join(', ')}] ya están reservadas para la ocupación "${nombreConflicto}"`,
+ 92:       );
+ 93:     }
+ 94: 
+ 95:     // Crear ocupación y relaciones en una transacción
+ 96:     return this.prisma.$transaction(async (tx) => {
+ 97:       const ocupacion = await tx.ocupacion.create({
+ 98:         data: {
+ 99:           ...rest,
+100:           telefono: telefono ?? undefined,
+101:           fechaDesde: fechaDesdeDate,
+102:           fechaHasta: fechaHastaDate,
+103:           horaDesde,
+104:           horaHasta,
+105:           areas: {
+106:             create: areaIds.map((areaId) => ({ areaId })),
+107:           },
+108:         },
+109:         include: { areas: { include: { area: true } } },
+110:       });
+111: 
+112:       // Marcar áreas como OCUPADO
+113:       await tx.area.updateMany({
+114:         where: { id: { in: areaIds } },
+115:         data:  { estado: AreaStatus.OCUPADO },
+116:       });
 117: 
-118:   echo ""
-119:   echo "╔══════════════════════════════════════════════════════════════════╗"
-120:   echo "║  ✅  BACKEND completado                                          ║"
-121:   echo "╚══════════════════════════════════════════════════════════════════╝"
-122:   echo ""
-123:   echo "  Cambios:"
-124:   echo "    · prisma.service.ts → pg.Pool max=10, idle=30s, timeout=5s"
-125:   echo "    · ocupacion.service.ts → cron cada 5 min (era cada 1 min)"
-126:   echo ""
-127:   echo "  Sin cambios de schema."
-128:   echo ""
-129: fi
-130: 
-131: # ════════════════════════════════════════════════════════════════════════════
-132: # FRONTEND
-133: # ════════════════════════════════════════════════════════════════════════════
-134: if [ "$IS_FRONT" = true ]; then
-135:   echo ""
-136:   echo "── FRONTEND ─────────────────────────────────────────────────────────"
-137: 
-138:   # ── hooks/use-seats.ts — fetchSeats estable + polling controlado ────────
-139:   echo "📄  hooks/use-seats.ts..."
-140:   cat > hooks/use-seats.ts << 'EOF'
-141: "use client"
-142: 
-143: import { useState, useCallback, useRef, useEffect } from "react"
-144: import { areasApi, reservasApi, convertBackendAreaToSeat } from "@/lib/api"
-145: import type { Seat } from "@/types/seat"
-146: import { useToast } from "@/hooks/use-toast"
-147: 
-148: // Polling cada 30s — suficiente para datos en tiempo real sin saturar la DB
-149: const POLLING_MS = 30_000
-150: 
-151: export function useSeats() {
-152:   const { toast }    = useToast()
-153:   const toastRef     = useRef(toast)
-154:   useEffect(() => { toastRef.current = toast }, [toast])
-155: 
-156:   const [seats,   setSeats]   = useState<Seat[]>([])
-157:   const [loading, setLoading] = useState(false)
-158:   const [error,   setError]   = useState<string | null>(null)
+118:       return ocupacion;
+119:     });
+120:   }
+121: 
+122:   // ── FIND ALL ───────────────────────────────────────────────────────────────
+123:   findAll() {
+124:     return this.prisma.ocupacion.findMany({
+125:       orderBy: { createdAt: 'desc' },
+126:       include: { areas: { include: { area: true } } },
+127:     });
+128:   }
+129: 
+130:   // ── FIND ACTIVAS ───────────────────────────────────────────────────────────
+131:   findActivas() {
+132:     const hoy = new Date();
+133:     hoy.setUTCHours(0, 0, 0, 0);
+134:     return this.prisma.ocupacion.findMany({
+135:       where: {
+136:         liberadaAt: null,
+137:         fechaHasta: { gte: hoy },
+138:       },
+139:       orderBy: { fechaDesde: 'asc' },
+140:       include: { areas: { include: { area: true } } },
+141:     });
+142:   }
+143: 
+144:   // ── FIND ONE ───────────────────────────────────────────────────────────────
+145:   async findOne(id: number) {
+146:     const oc = await this.prisma.ocupacion.findUnique({
+147:       where: { id },
+148:       include: { areas: { include: { area: true } } },
+149:     });
+150:     if (!oc) throw new NotFoundException('Ocupación no encontrada');
+151:     return oc;
+152:   }
+153: 
+154:   // ── UPDATE ─────────────────────────────────────────────────────────────────
+155:   async update(id: number, dto: UpdateOcupacionDto) {
+156:     await this.findOne(id);
+157: 
+158:     const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
 159: 
-160:   // ── fetchSeats: estable, no se recrea entre renders ──────────────────────
-161:   const fetchSeats = useCallback(async () => {
-162:     try {
-163:       setLoading(true)
-164:       setError(null)
-165:       const [areas, reservas] = await Promise.all([
-166:         areasApi.getAll(),
-167:         reservasApi.getAll(),
-168:       ])
-169:       setSeats(areas.map((area) => convertBackendAreaToSeat(area, reservas)))
-170:     } catch (err) {
-171:       const msg = err instanceof Error ? err.message : "Error al cargar áreas"
-172:       setError(msg)
-173:     } finally {
-174:       setLoading(false)
-175:     }
-176:   }, []) // sin deps → referencia estable entre renders
-177: 
-178:   // ── updateSeatStatus ─────────────────────────────────────────────────────
-179:   const updateSeatStatus = useCallback(async (
-180:     seat: Seat,
-181:     newStatus: string,
-182:     userName?: string,
-183:     peopleCount?: number,
-184:     shareLimit?: number,
-185:   ) => {
-186:     if (!seat.backendId) throw new Error("Asiento sin ID de backend")
-187: 
-188:     try {
-189:       if (newStatus === "occupied" || newStatus === "for-share" || newStatus === "shared") {
-190:         if (!userName) throw new Error("Nombre de usuario requerido")
-191: 
-192:         // Buscar usuario por nombre
-193:         const user = await (async () => {
-194:           try {
-195:             const res = await fetch(
-196:               `${process.env.NEXT_PUBLIC_API_URL ?? ""}/usuario`,
-197:               { headers: { "Content-Type": "application/json" } }
-198:             )
-199:             if (!res.ok) return null
-200:             const usuarios = await res.json()
-201:             return usuarios.find((u: { nombre: string; id: number }) => u.nombre === userName) ?? null
-202:           } catch { return null }
-203:         })()
-204: 
-205:         const usuarioId = user?.id ?? 1
-206:         const detalles  =
-207:           newStatus === "for-share"
-208:             ? `Para compartir (límite: ${shareLimit || 6}, personas: ${peopleCount})`
-209:             : `Ocupado por ${peopleCount} persona(s)`
+160:     const fechaDesdeDate = fechaDesde ? new Date(`${fechaDesde}T00:00:00.000Z`) : undefined;
+161:     const fechaHastaDate = fechaHasta ? new Date(`${fechaHasta}T00:00:00.000Z`) : undefined;
+162: 
+163:     return this.prisma.ocupacion.update({
+164:       where: { id },
+165:       data: {
+166:         ...rest,
+167:         ...(telefono !== undefined && { telefono }),
+168:         ...(fechaDesdeDate && { fechaDesde: fechaDesdeDate }),
+169:         ...(fechaHastaDate && { fechaHasta: fechaHastaDate }),
+170:         ...(horaDesde && { horaDesde }),
+171:         ...(horaHasta && { horaHasta }),
+172:         ...(areaIds && {
+173:           areas: {
+174:             deleteMany: {},
+175:             create: areaIds.map((areaId) => ({ areaId })),
+176:           },
+177:         }),
+178:       },
+179:       include: { areas: { include: { area: true } } },
+180:     });
+181:   }
+182: 
+183:   // ── LIBERAR ────────────────────────────────────────────────────────────────
+184:   async liberar(id: number) {
+185:     const oc = await this.findOne(id);
+186: 
+187:     return this.prisma.$transaction(async (tx) => {
+188:       const liberada = await tx.ocupacion.update({
+189:         where: { id },
+190:         data:  { liberadaAt: new Date() },
+191:         include: { areas: { include: { area: true } } },
+192:       });
+193: 
+194:       const areaIds = oc.areas.map((r) => r.areaId);
+195:       await tx.area.updateMany({
+196:         where: { id: { in: areaIds } },
+197:         data:  { estado: AreaStatus.LIBRE },
+198:       });
+199: 
+200:       return liberada;
+201:     });
+202:   }
+203: 
+204:   // ── REMOVE ─────────────────────────────────────────────────────────────────
+205:   async remove(id: number) {
+206:     const oc = await this.findOne(id);
+207: 
+208:     return this.prisma.$transaction(async (tx) => {
+209:       await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
 210: 
-211:         await reservasApi.create({ nombre: userName, detalles, usuarioId, areaId: seat.backendId })
+211:       const removed = await tx.ocupacion.delete({ where: { id } });
 212: 
-213:         if (newStatus === "for-share") {
-214:           const reservas    = await reservasApi.getAll()
-215:           const activeCount = reservas.filter((r) => r.areaId === seat.backendId && r.fin === null).length
-216:           await areasApi.cambiarEstado(seat.backendId, activeCount >= (shareLimit || 6) ? "shared" : newStatus)
-217:         } else {
-218:           await areasApi.cambiarEstado(seat.backendId, newStatus)
-219:         }
-220: 
-221:         toastRef.current({ title: "Reserva creada", description: `${seat.id} asignado a ${userName}` })
-222:       } else {
-223:         await areasApi.cambiarEstado(seat.backendId, newStatus)
-224:         toastRef.current({ title: "Estado actualizado", description: `${seat.id} cambió de estado` })
-225:       }
-226: 
-227:       await fetchSeats()
-228:     } catch (err) {
-229:       const msg = err instanceof Error ? err.message : "Error al actualizar"
-230:       setError(msg)
-231:       toastRef.current({ variant: "destructive", title: "Error al actualizar asiento", description: msg })
-232:       throw err
-233:     }
-234:   }, [fetchSeats])
-235: 
-236:   // ── toggleBlockAll ───────────────────────────────────────────────────────
-237:   const toggleBlockAll = useCallback(async (block: boolean) => {
-238:     try {
-239:       setLoading(true)
-240:       await areasApi.bloquearTodas(block)
-241:       toastRef.current({
-242:         title:       block ? "Coworking bloqueado" : "Coworking desbloqueado",
-243:         description: block ? "Todas las áreas están bloqueadas" : "Las áreas volvieron a su estado libre",
-244:       })
-245:       await fetchSeats()
-246:     } catch (err) {
-247:       const msg = err instanceof Error ? err.message : "Error al operar"
-248:       setError(msg)
-249:       toastRef.current({ variant: "destructive", title: "Error", description: msg })
-250:     } finally {
-251:       setLoading(false)
-252:     }
-253:   }, [fetchSeats])
-254: 
-255:   return { seats, loading, error, fetchSeats, updateSeatStatus, toggleBlockAll, POLLING_MS }
-256: }
-257: EOF
-258:   echo "✅  hooks/use-seats.ts"
-259: 
-260:   # ── app/page.tsx — polling controlado, useEffect sin deps ───────────────
-261:   echo "📄  app/page.tsx — polling controlado..."
-262:   cat > app/page.tsx << 'EOF'
-263: "use client"
-264: 
-265: import { useState, useEffect, useRef } from "react"
-266: import { useRouter }            from "next/navigation"
-267: import { useAuth }              from "@/contexts/auth-context"
-268: import { useSeats }             from "@/hooks/use-seats"
-269: import { useEventoActivo }      from "@/hooks/use-evento-activo"
-270: import { SeatGrid }             from "@/components/seat-grid"
-271: import { SeatLegend }           from "@/components/seat-legend"
-272: import { AdminPanel }           from "@/components/admin-panel"
-273: import { AgendarModal }         from "@/components/agendar-modal"
-274: import { MapaModal }            from "@/components/mapa-modal"
-275: import { DisponibilidadInline } from "@/components/disponibilidad-inline"
-276: import { CalendarioCoworking }  from "@/components/calendario-coworking"
-277: import { EventoActivoBanner }   from "@/components/evento-activo-banner"
-278: import { Button }               from "@/components/ui/button"
-279: import { Switch }               from "@/components/ui/switch"
-280: import { Label }                from "@/components/ui/label"
-281: import { cn }                   from "@/lib/utils"
-282: import { useToast }             from "@/hooks/use-toast"
-283: import {
-284:   Loader2, RefreshCw, LogOut, Menu,
-285:   Armchair, CalendarPlus, CalendarRange, MapPin, Map, LayoutGrid,
-286: } from "lucide-react"
-287: import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-288: 
-289: type Vista = "disponibilidad" | "asientos" | "mapa" | "agendar" | "calendario"
-290: 
-291: const VISTAS: { id: Vista; label: string; icon: React.ElementType }[] = [
-292:   { id: "disponibilidad", label: "Disponibilidad", icon: MapPin        },
-293:   { id: "asientos",       label: "Asientos",       icon: LayoutGrid    },
-294:   { id: "mapa",           label: "Mapa",           icon: Map           },
-295:   { id: "agendar",        label: "Agendar",        icon: CalendarPlus  },
-296:   { id: "calendario",     label: "Calendario",     icon: CalendarRange },
-297: ]
-298: 
-299: // Polling cada 30s — evita saturar la DB
-300: const POLLING_MS = 30_000
-301: 
-302: export default function CoworkingSeatsPage() {
-303:   const router  = useRouter()
-304:   const { admin, isAdmin, logout, loading: authLoading } = useAuth()
-305:   const { seats, loading, fetchSeats, toggleBlockAll }   = useSeats()
-306:   const { eventoActivo }      = useEventoActivo()
-307:   const { toast }             = useToast()
-308: 
-309:   const [isAdminMode,    setIsAdminMode]    = useState(false)
-310:   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-311:   const [vista,          setVista]          = useState<Vista>("asientos")
-312:   const [mapaOpen,       setMapaOpen]       = useState(false)
-313:   const [agendarOpen,    setAgendarOpen]    = useState(false)
-314: 
-315:   const bloqueadoPorEventoRef = useRef<string | null>(null)
-316: 
-317:   // ── Auth guard ────────────────────────────────────────────────────────────
-318:   useEffect(() => {
-319:     if (!authLoading && !admin) router.push("/login")
-320:   }, [admin, authLoading, router])
-321: 
-322:   // ── Carga inicial UNA sola vez ────────────────────────────────────────────
-323:   useEffect(() => {
-324:     fetchSeats()
-325:     // fetchSeats es estable (useCallback con []) → este effect solo corre al montar
-326:   }, [fetchSeats])
-327: 
-328:   // ── Polling cada 30s — controlado ────────────────────────────────────────
-329:   useEffect(() => {
-330:     const id = setInterval(fetchSeats, POLLING_MS)
-331:     return () => clearInterval(id)
-332:   }, [fetchSeats]) // fetchSeats es estable → el interval se crea una sola vez
-333: 
-334:   // ── Auto-bloqueo por evento del calendario ────────────────────────────────
-335:   useEffect(() => {
-336:     const eventoId = eventoActivo?.id ?? null
-337:     if (eventoId === bloqueadoPorEventoRef.current) return
-338: 
-339:     if (eventoId !== null && bloqueadoPorEventoRef.current === null) {
-340:       bloqueadoPorEventoRef.current = eventoId
-341:       toggleBlockAll(true).catch(() => {})
-342:     } else if (eventoId === null && bloqueadoPorEventoRef.current !== null) {
-343:       bloqueadoPorEventoRef.current = null
-344:       toggleBlockAll(false).catch(() => {})
-345:     } else if (eventoId !== null && eventoId !== bloqueadoPorEventoRef.current) {
-346:       bloqueadoPorEventoRef.current = eventoId
-347:     }
-348:   }, [eventoActivo, toggleBlockAll])
-349: 
-350:   // ── Handlers ──────────────────────────────────────────────────────────────
-351:   const handleRefresh = async () => {
-352:     await fetchSeats()
-353:     toast({ title: "Datos actualizados" })
-354:   }
-355: 
-356:   const handleVista = (v: Vista) => {
-357:     if (v === "mapa")    { setMapaOpen(true);   return }
-358:     if (v === "agendar") { setAgendarOpen(true); return }
-359:     setVista(v)
-360:   }
-361: 
-362:   const bloqueadoPorEvento = eventoActivo !== null
-363:   const bloqueadoManual    = !bloqueadoPorEvento && seats.length > 0 && seats.every((s) => s.status === "occupied")
-364:   const isBlocked          = bloqueadoPorEvento || bloqueadoManual
-365:   const occupiedCount      = seats.filter((s) => s.status === "occupied").length
-366:   const availableCount     = seats.filter((s) => s.status === "available").length
-367: 
-368:   if (authLoading) {
-369:     return (
-370:       <div className="min-h-screen flex items-center justify-center">
-371:         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-372:       </div>
-373:     )
-374:   }
-375:   if (!admin) return null
-376: 
-377:   if (loading && seats.length === 0) {
-378:     return (
-379:       <div className="min-h-screen flex items-center justify-center px-4">
-380:         <div className="text-center space-y-3">
-381:           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-382:           <p className="text-muted-foreground text-sm">Cargando áreas...</p>
-383:         </div>
-384:       </div>
-385:     )
-386:   }
-387: 
-388:   return (
-389:     <div className="min-h-screen bg-gradient-to-b from-background to-secondary">
-390: 
-391:       {/* ══ Header ══════════════════════════════════════════════════ */}
-392:       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-border/50 shadow-sm">
-393:         <div className="max-w-2xl mx-auto px-4 py-3">
-394: 
-395:           <div className="hidden md:flex items-center justify-between">
-396:             <div className="flex items-center gap-3">
-397:               <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-398:                 <Armchair className="w-5 h-5 text-primary" />
-399:               </div>
-400:               <div>
-401:                 <h1 className="text-base font-bold leading-tight">Coworking</h1>
-402:                 <p className="text-xs text-muted-foreground">{admin.email}</p>
-403:               </div>
-404:             </div>
-405:             <div className="flex items-center gap-3">
-406:               <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={loading} className="h-8 w-8">
-407:                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-408:               </Button>
-409:               {isAdmin && (
-410:                 <div className="flex items-center gap-2">
-411:                   <Switch id="admin-mode" checked={isAdminMode} onCheckedChange={setIsAdminMode} />
-412:                   <Label htmlFor="admin-mode" className="text-sm cursor-pointer">Admin</Label>
-413:                 </div>
-414:               )}
-415:               <Button variant="ghost" size="icon" onClick={logout} className="h-8 w-8 text-muted-foreground">
-416:                 <LogOut className="w-4 h-4" />
-417:               </Button>
-418:             </div>
-419:           </div>
-420: 
-421:           <div className="flex md:hidden items-center justify-between">
-422:             <div className="flex items-center gap-2">
-423:               <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-424:                 <Armchair className="w-4 h-4 text-primary" />
-425:               </div>
-426:               <span className="font-bold text-sm">Coworking</span>
-427:             </div>
-428:             <div className="flex items-center gap-1">
-429:               <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={loading} className="h-8 w-8">
-430:                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-431:               </Button>
-432:               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-433:                 <SheetTrigger asChild>
-434:                   <Button variant="ghost" size="icon" className="h-8 w-8">
-435:                     <Menu className="w-4 h-4" />
-436:                   </Button>
-437:                 </SheetTrigger>
-438:                 <SheetContent side="right" className="w-72">
-439:                   <div className="space-y-3 pt-4">
-440:                     <div className="pb-3 border-b">
-441:                       <p className="font-semibold">{admin.nombre}</p>
-442:                       <p className="text-xs text-muted-foreground">{admin.email}</p>
-443:                     </div>
-444:                     <Button variant="outline" className="w-full justify-start gap-2"
-445:                       onClick={() => { handleRefresh(); setMobileMenuOpen(false) }}>
-446:                       <RefreshCw className="w-4 h-4" /> Actualizar
-447:                     </Button>
-448:                     {isAdmin && (
-449:                       <div className="flex items-center gap-2 py-1">
-450:                         <Switch id="admin-mode-mobile" checked={isAdminMode} onCheckedChange={setIsAdminMode} />
-451:                         <Label htmlFor="admin-mode-mobile" className="cursor-pointer">Modo Admin</Label>
-452:                       </div>
-453:                     )}
-454:                     <Button variant="outline"
-455:                       className="w-full justify-start gap-2 text-destructive hover:text-destructive"
-456:                       onClick={logout}>
-457:                       <LogOut className="w-4 h-4" /> Cerrar sesión
-458:                     </Button>
-459:                   </div>
-460:                 </SheetContent>
-461:               </Sheet>
-462:             </div>
-463:           </div>
-464: 
-465:         </div>
-466:       </div>
-467: 
-468:       {/* ══ Contenido ════════════════════════════════════════════════ */}
-469:       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4 pb-24">
-470: 
-471:         {eventoActivo && <EventoActivoBanner evento={eventoActivo} />}
-472: 
-473:         <div className="grid grid-cols-3 gap-3">
-474:           <div className="bg-white rounded-xl border border-border p-3 md:p-4 text-center shadow-sm">
-475:             <p className="text-xl md:text-2xl font-bold text-foreground">{seats.length}</p>
-476:             <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Total</p>
-477:           </div>
-478:           <div className="bg-white rounded-xl border border-green-100 p-3 md:p-4 text-center shadow-sm">
-479:             <p className="text-xl md:text-2xl font-bold text-green-500">{availableCount}</p>
-480:             <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Libres</p>
-481:           </div>
-482:           <div className="bg-white rounded-xl border border-red-100 p-3 md:p-4 text-center shadow-sm">
-483:             <p className="text-xl md:text-2xl font-bold text-red-500">{occupiedCount}</p>
-484:             <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Ocupados</p>
-485:           </div>
-486:         </div>
-487: 
-488:         {isAdminMode && isAdmin && !bloqueadoPorEvento && (
-489:           <AdminPanel isBlocked={bloqueadoManual} onToggleBlock={toggleBlockAll} />
-490:         )}
-491: 
-492:         {isAdminMode && isAdmin && bloqueadoPorEvento && (
-493:           <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs text-orange-700">
-494:             El panel de administración está deshabilitado mientras haya un evento activo.
-495:             Las áreas se liberarán automáticamente cuando el evento termine.
-496:           </div>
-497:         )}
-498: 
-499:         <div className="bg-white rounded-xl border border-primary/10 shadow-sm overflow-hidden">
-500:           <div className="border-b border-border px-4 pt-4 pb-0">
-501:             <div className="flex gap-1 overflow-x-auto scrollbar-none">
-502:               {VISTAS.map(({ id, label, icon: Icon }) => {
-503:                 const isModal  = id === "mapa" || id === "agendar"
-504:                 const isActive = !isModal && vista === id
-505:                 return (
-506:                   <button key={id} onClick={() => handleVista(id)}
-507:                     className={cn(
-508:                       "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0",
-509:                       isActive
-510:                         ? "border-primary text-primary bg-primary/5"
-511:                         : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
-512:                       id === "agendar" && !isActive ? "hover:text-primary" : "",
-513:                     )}>
-514:                     <Icon className="w-4 h-4" />
-515:                     <span>{label}</span>
-516:                   </button>
-517:                 )
-518:               })}
-519:             </div>
-520:           </div>
-521: 
-522:           <div className="p-4 md:p-6">
-523:             {vista === "disponibilidad" && <DisponibilidadInline onSuccess={fetchSeats} />}
-524:             {vista === "asientos" && (
-525:               <div className="space-y-4">
-526:                 <div className="flex items-center justify-between">
-527:                   <SeatLegend />
-528:                   {isBlocked && (
-529:                     <span className="text-xs text-destructive font-medium">
-530:                       {bloqueadoPorEvento ? `Evento: ${eventoActivo?.titulo}` : "Bloqueado"}
-531:                     </span>
-532:                   )}
-533:                 </div>
-534:                 <div className="overflow-x-auto">
-535:                   <SeatGrid seats={seats} isBlocked={isBlocked && !isAdminMode} />
-536:                 </div>
-537:               </div>
-538:             )}
-539:             {vista === "calendario" && <CalendarioCoworking />}
-540:           </div>
-541:         </div>
-542: 
-543:       </div>
-544: 
-545:       <MapaModal    open={mapaOpen}    onOpenChange={setMapaOpen} />
-546:       <AgendarModal open={agendarOpen} onOpenChange={setAgendarOpen} onSuccess={fetchSeats} />
-547: 
-548:     </div>
-549:   )
-550: }
-551: EOF
-552:   echo "✅  app/page.tsx"
-553: 
-554:   echo ""
-555:   echo "🔨  Compilando frontend..."
-556:   pnpm build
-557: 
-558:   echo ""
-559:   echo "╔══════════════════════════════════════════════════════════════════╗"
-560:   echo "║  ✅  FRONTEND completado                                         ║"
-561:   echo "╚══════════════════════════════════════════════════════════════════╝"
-562:   echo ""
-563:   echo "  Cambios:"
-564:   echo "    · hooks/use-seats.ts → fetchSeats useCallback([]) estable"
-565:   echo "                           polling SOLO en app/page.tsx cada 30s"
-566:   echo "    · app/page.tsx       → polling setInterval 30s, un solo"
-567:   echo "                           useEffect de carga inicial"
-568:   echo ""
-569: fi
+213:       const areaIds = oc.areas.map((r) => r.areaId);
+214:       await tx.area.updateMany({
+215:         where: { id: { in: areaIds } },
+216:         data:  { estado: AreaStatus.LIBRE },
+217:       });
+218: 
+219:       return removed;
+220:     });
+221:   }
+222: }
 ````
 
 ## File: src/app.module.ts
@@ -2857,105 +2226,6 @@ x.sh
 54:               -e CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}" \
 55:               -e PORT="${{ secrets.PORT }}" \
 56:               ghcr.io/${{ github.repository }}:latest
-````
-
-## File: prisma/schema.prisma
-````prisma
- 1: // This is your Prisma schema file,
- 2: // learn more about it in the docs: https://pris.ly/d/prisma-schema
- 3: 
- 4: // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
- 5: // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
- 6: 
- 7: generator client {
- 8:   provider = "prisma-client-js"
- 9:   // Remove engineType = "client" if it exists, or explicitly set to "binary" or "library"
-10:   engineType = "client" 
-11: }
-12: 
-13: datasource db {
-14:   provider = "postgresql"
-15: }
-16: 
-17: // -----------------------------
-18: // ENUMS
-19: // -----------------------------
-20: enum AreaStatus {
-21:   LIBRE
-22:   OCUPADO
-23: }
-24: 
-25: // -----------------------------
-26: // MODELS
-27: // -----------------------------
-28: 
-29: model Usuario {
-30:   id        Int        @id @default(autoincrement())
-31:   nombre    String
-32:   email     String     @unique
-33:   reservas  Reserva[]
-34:   createdAt DateTime   @default(now())
-35: }
-36: 
-37: model Admin {
-38:   id        Int      @id @default(autoincrement())
-39:   email     String   @unique
-40:   password  String
-41:   createdAt DateTime @default(now())
-42: }
-43: 
-44: model Area {
-45:   id          Int         @id @default(autoincrement())
-46:   nombre      String
-47:   descripcion String?
-48:   estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
-49:   reservas    Reserva[]
-50:   createdAt   DateTime    @default(now())
-51:   areas  OcupacionArea[]
-52: }
-53: 
-54: model Reserva {
-55:   id         Int        @id @default(autoincrement())
-56:   nombre     String     // Nombre del cliente que reservó
-57:   detalles   String?    // Datos adicionales de la reserva
-58:   usuario    Usuario    @relation(fields: [usuarioId], references: [id])
-59:   usuarioId  Int
-60:   area       Area       @relation(fields: [areaId], references: [id])
-61:   areaId     Int
-62:   inicio     DateTime   @default(now())
-63:   fin        DateTime?  // Se completa al liberar
-64:   createdAt  DateTime   @default(now())
-65: }
-66: 
-67: model Ocupacion {
-68:   id               Int             @id @default(autoincrement())
-69:   titulo           String
-70:   requerimiento    String
-71:   cantidadPersonas Int
-72:   organizador      String
-73:   // ── Reemplaza dia: String + hora: String ──
-74:   fechaDesde       DateTime
-75:   fechaHasta       DateTime
-76:   horaDesde        String
-77:   horaHasta        String
-78:   // ─────────────────────────────────────────
-79:   edadMin          Int?
-80:   edadMax          Int?
-81:   anexos           String[]
-82:   liberadaAt       DateTime?
-83:   areas            OcupacionArea[]
-84:   createdAt        DateTime        @default(now())
-85:   updatedAt        DateTime        @updatedAt
-86: }
-87: 
-88: model OcupacionArea {
-89:   ocupacionId Int
-90:   areaId      Int
-91:   ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
-92:   area        Area      @relation(fields: [areaId], references: [id])
-93: 
-94:   @@id([ocupacionId, areaId])
-95: }
 ````
 
 ## File: package.json
@@ -3132,6 +2402,370 @@ x.sh
 170:     ]
 171:   }
 172: }
+````
+
+## File: x.sh
+````bash
+  1: #!/usr/bin/env bash
+  2: # ============================================================================
+  3: #  v28-back-editar-reserva.sh  — coworking-back
+  4: #  Mejora el endpoint PATCH /reservas/:id con validación real de negocio:
+  5: #  - Permite editar nombre, detalles y recepcion sin side-effects
+  6: #  - Si cambia el areaId: libera el área vieja y valida/ocupa la nueva
+  7: # ============================================================================
+  8: set -euo pipefail
+  9: 
+ 10: [[ -f "package.json" && -d "src" ]] || { echo "❌  Corré desde la raíz de coworking-back"; exit 1; }
+ 11: 
+ 12: echo "════════════════════════════════════════════════════════"
+ 13: echo "  v28-back-editar-reserva  |  coworking-back"
+ 14: echo "════════════════════════════════════════════════════════"
+ 15: echo ""
+ 16: 
+ 17: # ── src/reserva/reserva.service.ts ───────────────────────────────────────────
+ 18: echo "📝  Actualizando reserva.service.ts..."
+ 19: cat > src/reserva/reserva.service.ts << 'EOF'
+ 20: import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+ 21: import { CreateReservaDto } from './dto/create-reserva.dto';
+ 22: import { UpdateReservaDto } from './dto/update-reserva.dto';
+ 23: import { PrismaService } from 'prisma/prisma.service';
+ 24: import { AreaStatus } from '@prisma/client';
+ 25: 
+ 26: // ── Helpers de tiempo (Argentina, UTC-3) ─────────────────────────────────────
+ 27: 
+ 28: function timeToMinutes(hhmm: string): number {
+ 29:   const [h, m] = hhmm.split(':').map(Number);
+ 30:   return h * 60 + m;
+ 31: }
+ 32: 
+ 33: function hoyArgentina(): string {
+ 34:   const ahora = new Date();
+ 35:   ahora.setHours(ahora.getHours() - 3);
+ 36:   return ahora.toISOString().split('T')[0];
+ 37: }
+ 38: 
+ 39: function nowMinutesArgentina(): number {
+ 40:   const ahora = new Date();
+ 41:   ahora.setHours(ahora.getHours() - 3);
+ 42:   return ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
+ 43: }
+ 44: 
+ 45: @Injectable()
+ 46: export class ReservaService {
+ 47:   constructor(private prisma: PrismaService) {}
+ 48: 
+ 49:   // ── Verifica que no exista una Ocupación activa para el área ──────────────
+ 50:   private async verificarOcupacionActiva(areaId: number): Promise<void> {
+ 51:     const hoy     = hoyArgentina();
+ 52:     const nowMins = nowMinutesArgentina();
+ 53: 
+ 54:     const ocupacion = await this.prisma.ocupacion.findFirst({
+ 55:       where: {
+ 56:         liberadaAt: null,
+ 57:         areas: { some: { areaId } },
+ 58:         fechaDesde: { lte: new Date(`${hoy}T23:59:59.000Z`) },
+ 59:         fechaHasta: { gte: new Date(`${hoy}T00:00:00.000Z`) },
+ 60:       },
+ 61:     });
+ 62: 
+ 63:     if (!ocupacion) return;
+ 64: 
+ 65:     const fechaDesdeStr = ocupacion.fechaDesde.toISOString().split('T')[0];
+ 66:     const fechaHastaStr = ocupacion.fechaHasta.toISOString().split('T')[0];
+ 67: 
+ 68:     if (fechaDesdeStr < hoy && fechaHastaStr > hoy) {
+ 69:       throw new BadRequestException(
+ 70:         `El área está ocupada por "${ocupacion.titulo}" hasta el ${fechaHastaStr}`,
+ 71:       );
+ 72:     }
+ 73: 
+ 74:     const desdeMin = fechaDesdeStr === hoy ? timeToMinutes(ocupacion.horaDesde) : 0;
+ 75:     const hastaMin = fechaHastaStr === hoy ? timeToMinutes(ocupacion.horaHasta) : 24 * 60;
+ 76: 
+ 77:     if (nowMins >= desdeMin && nowMins < hastaMin) {
+ 78:       throw new BadRequestException(
+ 79:         `El área está ocupada por "${ocupacion.titulo}" hoy de ${ocupacion.horaDesde} a ${ocupacion.horaHasta}`,
+ 80:       );
+ 81:     }
+ 82:   }
+ 83: 
+ 84:   // ── CREATE ────────────────────────────────────────────────────────────────
+ 85:   async create(data: CreateReservaDto) {
+ 86:     const area = await this.prisma.area.findUnique({ where: { id: data.areaId } });
+ 87: 
+ 88:     if (!area) throw new NotFoundException('Área no encontrada');
+ 89:     if (area.estado !== AreaStatus.LIBRE)
+ 90:       throw new BadRequestException('El área no está disponible');
+ 91: 
+ 92:     await this.verificarOcupacionActiva(data.areaId);
+ 93: 
+ 94:     const reserva = await this.prisma.reserva.create({ data });
+ 95: 
+ 96:     await this.prisma.area.update({
+ 97:       where: { id: data.areaId },
+ 98:       data: { estado: AreaStatus.OCUPADO },
+ 99:     });
+100: 
+101:     return reserva;
+102:   }
+103: 
+104:   // ── FIND ALL ──────────────────────────────────────────────────────────────
+105:   findAll() {
+106:     return this.prisma.reserva.findMany({
+107:       include: { usuario: true, area: true },
+108:     });
+109:   }
+110: 
+111:   // ── FIND ONE ──────────────────────────────────────────────────────────────
+112:   findOne(id: number) {
+113:     return this.prisma.reserva.findUnique({
+114:       where: { id },
+115:       include: { usuario: true, area: true },
+116:     });
+117:   }
+118: 
+119:   // ── UPDATE ────────────────────────────────────────────────────────────────
+120:   // Permite editar: nombre, detalles, recepcion (seguros, sin side-effects).
+121:   // Si cambia areaId: libera el área vieja, valida y ocupa la nueva.
+122:   async update(id: number, dto: UpdateReservaDto) {
+123:     const reserva = await this.prisma.reserva.findUnique({
+124:       where: { id },
+125:       include: { area: true },
+126:     });
+127: 
+128:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+129:     if (reserva.fin !== null)
+130:       throw new BadRequestException('No se puede editar una reserva ya completada');
+131: 
+132:     const { areaId, ...camposSeguros } = dto;
+133: 
+134:     // ── Sin cambio de área: actualización simple ──────────────────────────
+135:     if (!areaId || areaId === reserva.areaId) {
+136:       return this.prisma.reserva.update({
+137:         where: { id },
+138:         data: camposSeguros,
+139:         include: { usuario: true, area: true },
+140:       });
+141:     }
+142: 
+143:     // ── Cambio de área: validar nueva área y reasignar ────────────────────
+144:     const nuevaArea = await this.prisma.area.findUnique({ where: { id: areaId } });
+145: 
+146:     if (!nuevaArea) throw new NotFoundException('Área nueva no encontrada');
+147:     if (nuevaArea.estado !== AreaStatus.LIBRE)
+148:       throw new BadRequestException('El área nueva no está disponible');
+149: 
+150:     await this.verificarOcupacionActiva(areaId);
+151: 
+152:     return this.prisma.$transaction(async (tx) => {
+153:       // 1. Actualizar reserva con nueva área + campos
+154:       const actualizada = await tx.reserva.update({
+155:         where: { id },
+156:         data: { ...camposSeguros, areaId },
+157:         include: { usuario: true, area: true },
+158:       });
+159: 
+160:       // 2. Liberar área anterior (si no tiene otras reservas activas)
+161:       const otrasReservasEnAreaVieja = await tx.reserva.count({
+162:         where: {
+163:           areaId: reserva.areaId,
+164:           fin: null,
+165:           id: { not: id },
+166:         },
+167:       });
+168: 
+169:       if (otrasReservasEnAreaVieja === 0) {
+170:         await tx.area.update({
+171:           where: { id: reserva.areaId },
+172:           data: { estado: AreaStatus.LIBRE },
+173:         });
+174:       }
+175: 
+176:       // 3. Marcar nueva área como OCUPADO
+177:       await tx.area.update({
+178:         where: { id: areaId },
+179:         data: { estado: AreaStatus.OCUPADO },
+180:       });
+181: 
+182:       return actualizada;
+183:     });
+184:   }
+185: 
+186:   // ── COMPLETAR ─────────────────────────────────────────────────────────────
+187:   async completarReserva(id: number) {
+188:     const reserva = await this.prisma.reserva.findUnique({ where: { id } });
+189:     if (!reserva) throw new NotFoundException('Reserva no encontrada');
+190: 
+191:     const finalizada = await this.prisma.reserva.update({
+192:       where: { id },
+193:       data: { fin: new Date() },
+194:     });
+195: 
+196:     await this.prisma.area.update({
+197:       where: { id: reserva.areaId },
+198:       data: { estado: AreaStatus.LIBRE },
+199:     });
+200: 
+201:     return finalizada;
+202:   }
+203: 
+204:   // ── REMOVE ────────────────────────────────────────────────────────────────
+205:   remove(id: number) {
+206:     return this.prisma.reserva.delete({ where: { id } });
+207:   }
+208: }
+209: EOF
+210: echo "  ✅  reserva.service.ts listo"
+211: 
+212: # ── src/reserva/dto/update-reserva.dto.ts ────────────────────────────────────
+213: echo "📝  Actualizando update-reserva.dto.ts..."
+214: cat > src/reserva/dto/update-reserva.dto.ts << 'EOF'
+215: import { ApiPropertyOptional } from '@nestjs/swagger';
+216: import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+217: import { Recepcion } from '@prisma/client';
+218: 
+219: export class UpdateReservaDto {
+220:   @ApiPropertyOptional({ description: 'Nombre del cliente' })
+221:   @IsOptional()
+222:   @IsString()
+223:   nombre?: string;
+224: 
+225:   @ApiPropertyOptional({ description: 'Datos adicionales' })
+226:   @IsOptional()
+227:   @IsString()
+228:   detalles?: string;
+229: 
+230:   @ApiPropertyOptional({ description: 'Nuevo ID de área (reasignación)' })
+231:   @IsOptional()
+232:   @IsInt()
+233:   areaId?: number;
+234: 
+235:   @ApiPropertyOptional({
+236:     enum: Recepcion,
+237:     description: 'Turno de recepción: MANANA | INTERMEDIO | TARDE',
+238:   })
+239:   @IsOptional()
+240:   @IsEnum(Recepcion)
+241:   recepcion?: Recepcion;
+242: }
+243: EOF
+244: echo "  ✅  update-reserva.dto.ts listo"
+245: 
+246: # ── Build ─────────────────────────────────────────────────────────────────────
+247: echo ""
+248: echo "🔨  Build de verificación..."
+249: pnpm build
+250: 
+251: echo ""
+252: echo "✅  v28-back-editar-reserva completado"
+````
+
+## File: prisma/schema.prisma
+````prisma
+  1: // This is your Prisma schema file,
+  2: // learn more about it in the docs: https://pris.ly/d/prisma-schema
+  3: 
+  4: // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+  5: // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+  6: 
+  7: generator client {
+  8:   provider = "prisma-client-js"
+  9:   // Remove engineType = "client" if it exists, or explicitly set to "binary" or "library"
+ 10:   engineType = "client" 
+ 11: }
+ 12: 
+ 13: datasource db {
+ 14:   provider = "postgresql"
+ 15: }
+ 16: 
+ 17: // -----------------------------
+ 18: // ENUMS
+ 19: // -----------------------------
+ 20: enum AreaStatus {
+ 21:   LIBRE
+ 22:   OCUPADO
+ 23: }
+ 24: 
+ 25: enum Recepcion {
+ 26:   MANANA
+ 27:   INTERMEDIO
+ 28:   TARDE
+ 29: }
+ 30: 
+ 31: 
+ 32: // -----------------------------
+ 33: // MODELS
+ 34: // -----------------------------
+ 35: 
+ 36: model Usuario {
+ 37:   id        Int        @id @default(autoincrement())
+ 38:   nombre    String
+ 39:   email     String     @unique
+ 40:   reservas  Reserva[]
+ 41:   createdAt DateTime   @default(now())
+ 42: }
+ 43: 
+ 44: model Admin {
+ 45:   id        Int      @id @default(autoincrement())
+ 46:   email     String   @unique
+ 47:   password  String
+ 48:   createdAt DateTime @default(now())
+ 49: }
+ 50: 
+ 51: model Area {
+ 52:   id          Int         @id @default(autoincrement())
+ 53:   nombre      String
+ 54:   descripcion String?
+ 55:   estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
+ 56:   reservas    Reserva[]
+ 57:   createdAt   DateTime    @default(now())
+ 58:   areas  OcupacionArea[]
+ 59: }
+ 60: 
+ 61: model Reserva {
+ 62:   id         Int        @id @default(autoincrement())
+ 63:   nombre     String     // Nombre del cliente que reservó
+ 64:   detalles   String?    // Datos adicionales de la reserva
+ 65:   usuario    Usuario    @relation(fields: [usuarioId], references: [id])
+ 66:   usuarioId  Int
+ 67:   area       Area       @relation(fields: [areaId], references: [id])
+ 68:   areaId     Int
+ 69:   recepcion  Recepcion?
+ 70:   inicio     DateTime   @default(now())
+ 71:   fin        DateTime?  // Se completa al liberar
+ 72:   createdAt  DateTime   @default(now())
+ 73: }
+ 74: 
+ 75: model Ocupacion {
+ 76:   id               Int             @id @default(autoincrement())
+ 77:   titulo           String
+ 78:   requerimiento    String
+ 79:   cantidadPersonas Int
+ 80:   organizador      String
+ 81:   telefono         String?
+ 82:   // ── Reemplaza dia: String + hora: String ──
+ 83:   fechaDesde       DateTime
+ 84:   fechaHasta       DateTime
+ 85:   horaDesde        String
+ 86:   horaHasta        String
+ 87:   // ─────────────────────────────────────────
+ 88:   edadMin          Int?
+ 89:   edadMax          Int?
+ 90:   anexos           String[]
+ 91:   liberadaAt       DateTime?
+ 92:   areas            OcupacionArea[]
+ 93:   createdAt        DateTime        @default(now())
+ 94:   updatedAt        DateTime        @updatedAt
+ 95: }
+ 96: 
+ 97: model OcupacionArea {
+ 98:   ocupacionId Int
+ 99:   areaId      Int
+100:   ocupacion   Ocupacion @relation(fields: [ocupacionId], references: [id])
+101:   area        Area      @relation(fields: [areaId], references: [id])
+102: 
+103:   @@id([ocupacionId, areaId])
+104: }
 ````
 
 ## File: src/main.ts
