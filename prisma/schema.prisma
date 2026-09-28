@@ -67,6 +67,8 @@ model Reserva {
   area       Area       @relation(fields: [areaId], references: [id])
   areaId     Int
   recepcion  Recepcion?
+  receptor   String?
+  gmail      String?    
   inicio     DateTime   @default(now())
   fin        DateTime?  // Se completa al liberar
   createdAt  DateTime   @default(now())

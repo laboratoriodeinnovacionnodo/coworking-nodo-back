@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { Recepcion } from '@prisma/client';
 
 export class UpdateReservaDto {
@@ -7,6 +7,11 @@ export class UpdateReservaDto {
   @IsOptional()
   @IsString()
   nombre?: string;
+
+  @ApiPropertyOptional({ description: 'Gmail del cliente' })
+  @IsOptional()
+  @IsEmail()
+  gmail?: string;
 
   @ApiPropertyOptional({ description: 'Datos adicionales' })
   @IsOptional()
@@ -25,4 +30,9 @@ export class UpdateReservaDto {
   @IsOptional()
   @IsEnum(Recepcion)
   recepcion?: Recepcion;
+
+  @ApiPropertyOptional({ description: 'Nombre de quien recibe al cliente en recepción' })
+  @IsOptional()
+  @IsString()
+  receptor?: string;
 }
