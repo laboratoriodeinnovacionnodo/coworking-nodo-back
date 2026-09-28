@@ -89,6 +89,9 @@ model Ocupacion {
   // ─────────────────────────────────────────
   edadMin          Int?
   edadMax          Int?
+  gmail      String?
+  recepcion  Recepcion?
+  receptor   String?
   anexos           String[]
   liberadaAt       DateTime?
   areas            OcupacionArea[]

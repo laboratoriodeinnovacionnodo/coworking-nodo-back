@@ -5,6 +5,8 @@ import {
   IsArray,
   IsUrl,
   IsDateString,
+  IsEmail,
+  IsEnum,
   Matches,
   Min,
   Max,
@@ -14,6 +16,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { Recepcion } from '@prisma/client';
 
 export class CreateOcupacionDto {
   @ApiProperty({ description: 'Título del evento / ocupación' })
@@ -41,6 +44,24 @@ export class CreateOcupacionDto {
   @IsOptional()
   @IsString()
   telefono?: string;
+
+  @ApiPropertyOptional({ description: 'Gmail del organizador' })
+  @IsOptional()
+  @IsEmail()
+  gmail?: string;
+
+  @ApiPropertyOptional({
+    enum: Recepcion,
+    description: 'Turno de recepción del evento: MANANA | INTERMEDIO | TARDE',
+  })
+  @IsOptional()
+  @IsEnum(Recepcion)
+  recepcion?: Recepcion;
+
+  @ApiPropertyOptional({ description: 'Nombre de quien recibe al grupo en recepción' })
+  @IsOptional()
+  @IsString()
+  receptor?: string;
 
   @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
   @IsDateString()
