@@ -6,7 +6,6 @@ import {
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
 import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
-import { AreaStatus } from '@prisma/client';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function timeToMinutes(hhmm: string): number {
@@ -39,6 +38,7 @@ export class OcupacionService {
   constructor(private prisma: PrismaService) {}
 
   // ── CREATE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
   async create(dto: CreateOcupacionDto) {
     const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
 
@@ -61,26 +61,18 @@ export class OcupacionService {
 
     await this._validarConflictos(areaIds, fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta);
 
-    return this.prisma.$transaction(async (tx) => {
-      const ocupacion = await tx.ocupacion.create({
-        data: {
-          ...rest,
-          telefono: telefono ?? undefined,
-          fechaDesde: fechaDesdeDate,
-          fechaHasta: fechaHastaDate,
-          horaDesde,
-          horaHasta,
-          areas: { create: areaIds.map((areaId) => ({ areaId })) },
-        },
-        include: { areas: { include: { area: true } } },
-      });
-
-      await tx.area.updateMany({
-        where: { id: { in: areaIds } },
-        data:  { estado: AreaStatus.OCUPADO },
-      });
-
-      return ocupacion;
+    // Solo crea la ocupación — NO modifica area.estado
+    return this.prisma.ocupacion.create({
+      data: {
+        ...rest,
+        telefono: telefono ?? undefined,
+        fechaDesde: fechaDesdeDate,
+        fechaHasta: fechaHastaDate,
+        horaDesde,
+        horaHasta,
+        areas: { create: areaIds.map((areaId) => ({ areaId })) },
+      },
+      include: { areas: { include: { area: true } } },
     });
   }
 
@@ -113,21 +105,16 @@ export class OcupacionService {
     return oc;
   }
 
-  // ── UPDATE (completo) ──────────────────────────────────────────────────────
+  // ── UPDATE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
   async update(id: number, dto: UpdateOcupacionDto) {
     const oc = await this.findOne(id);
 
     const {
-      areaIds,
-      fechaDesde,
-      fechaHasta,
-      horaDesde,
-      horaHasta,
-      telefono,
-      ...rest
+      areaIds, fechaDesde, fechaHasta,
+      horaDesde, horaHasta, telefono, ...rest
     } = dto;
 
-    // Fechas efectivas (las nuevas o las actuales)
     const fechaDesdeDate = fechaDesde
       ? new Date(`${fechaDesde}T00:00:00.000Z`)
       : oc.fechaDesde;
@@ -138,7 +125,6 @@ export class OcupacionService {
     const horaDesdeEfectiva = horaDesde ?? oc.horaDesde;
     const horaHastaEfectiva = horaHasta ?? oc.horaHasta;
 
-    // Validar coherencia horaria
     if (fechaDesdeDate > fechaHastaDate) {
       throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
     }
@@ -146,10 +132,8 @@ export class OcupacionService {
       throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
     }
 
-    // IDs efectivos de áreas
     const areaIdsEfectivos = areaIds ?? oc.areas.map((r) => r.areaId);
 
-    // Si cambian áreas o fechas/horas, revalidar conflictos excluyendo esta misma ocupación
     const cambiaHorario =
       areaIds !== undefined ||
       fechaDesde !== undefined ||
@@ -158,7 +142,6 @@ export class OcupacionService {
       horaHasta !== undefined;
 
     if (cambiaHorario) {
-      // Verificar que todas las áreas nuevas existen
       if (areaIds !== undefined) {
         const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
         if (areas.length !== areaIds.length) {
@@ -173,96 +156,53 @@ export class OcupacionService {
         fechaHastaDate,
         horaDesdeEfectiva,
         horaHastaEfectiva,
-        id, // excluir la ocupación actual
+        id,
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Si cambian las áreas: liberar las viejas y ocupar las nuevas
-      if (areaIds !== undefined) {
-        const viejasIds = oc.areas.map((r) => r.areaId);
-        const nuevasIds = areaIds;
-
-        const liberadas = viejasIds.filter((aid) => !nuevasIds.includes(aid));
-        const agregadas = nuevasIds.filter((aid) => !viejasIds.includes(aid));
-
-        if (liberadas.length > 0) {
-          await tx.area.updateMany({
-            where: { id: { in: liberadas } },
-            data:  { estado: AreaStatus.LIBRE },
-          });
-        }
-        if (agregadas.length > 0) {
-          await tx.area.updateMany({
-            where: { id: { in: agregadas } },
-            data:  { estado: AreaStatus.OCUPADO },
-          });
-        }
-      }
-
-      const actualizada = await tx.ocupacion.update({
-        where: { id },
-        data: {
-          ...rest,
-          ...(telefono !== undefined && { telefono: telefono || null }),
-          fechaDesde: fechaDesdeDate,
-          fechaHasta: fechaHastaDate,
-          horaDesde:  horaDesdeEfectiva,
-          horaHasta:  horaHastaEfectiva,
-          ...(areaIds !== undefined && {
-            areas: {
-              deleteMany: {},
-              create: areaIds.map((areaId) => ({ areaId })),
-            },
-          }),
-        },
-        include: { areas: { include: { area: true } } },
-      });
-
-      return actualizada;
+    // Solo actualiza la ocupación — NO modifica area.estado
+    return this.prisma.ocupacion.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(telefono !== undefined && { telefono: telefono || null }),
+        fechaDesde: fechaDesdeDate,
+        fechaHasta: fechaHastaDate,
+        horaDesde:  horaDesdeEfectiva,
+        horaHasta:  horaHastaEfectiva,
+        ...(areaIds !== undefined && {
+          areas: {
+            deleteMany: {},
+            create: areaIds.map((areaId) => ({ areaId })),
+          },
+        }),
+      },
+      include: { areas: { include: { area: true } } },
     });
   }
 
   // ── LIBERAR ────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
   async liberar(id: number) {
-    const oc = await this.findOne(id);
+    await this.findOne(id);
 
-    return this.prisma.$transaction(async (tx) => {
-      const liberada = await tx.ocupacion.update({
-        where: { id },
-        data:  { liberadaAt: new Date() },
-        include: { areas: { include: { area: true } } },
-      });
-
-      const areaIds = oc.areas.map((r) => r.areaId);
-      await tx.area.updateMany({
-        where: { id: { in: areaIds } },
-        data:  { estado: AreaStatus.LIBRE },
-      });
-
-      return liberada;
+    return this.prisma.ocupacion.update({
+      where: { id },
+      data:  { liberadaAt: new Date() },
+      include: { areas: { include: { area: true } } },
     });
   }
 
   // ── REMOVE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
   async remove(id: number) {
-    const oc = await this.findOne(id);
+    await this.findOne(id);
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
-      const removed = await tx.ocupacion.delete({ where: { id } });
-
-      const areaIds = oc.areas.map((r) => r.areaId);
-      await tx.area.updateMany({
-        where: { id: { in: areaIds } },
-        data:  { estado: AreaStatus.LIBRE },
-      });
-
-      return removed;
-    });
+    await this.prisma.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+    return this.prisma.ocupacion.delete({ where: { id } });
   }
 
-  // ── helper: valida conflictos de horario excluyendo opcionalmente una oc ───
+  // ── helper: valida conflictos de horario ───────────────────────────────────
   private async _validarConflictos(
     areaIds: number[],
     fechaDesdeDate: Date,

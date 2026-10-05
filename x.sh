@@ -1,163 +1,292 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  v32-back-ocupacion-gmail-recepcion.sh  — coworking-back
+#  v35-back-no-persistir-estado.sh  — coworking-back
 #
-#  Agrega gmail, recepcion y receptor a Ocupacion (DTO + service).
+#  PROBLEMA: OcupacionService marca area.estado = OCUPADO al crear y
+#  area.estado = LIBRE al liberar. Eso desincroniza el estado porque
+#  no considera si la ocupación ya empezó o no.
 #
-#  ⚠️  ANTES de correr este script, en prisma/schema.prisma
-#      dentro de model Ocupacion agregá:
-#        gmail      String?
-#        recepcion  Recepcion?
-#        receptor   String?
+#  SOLUCIÓN: Eliminar TODOS los updateMany de area.estado en
+#  OcupacionService. El estado se calcula 100% en tiempo real desde
+#  GET /areas/estado-actual (basado en fechaDesde/Hasta + horaDesde/Hasta).
 #
-#      Luego migrá:
-#        pnpm prisma migrate dev --name add_gmail_recepcion_receptor_ocupacion
+#  ⚠️  Sin cambios en el schema — no requiere migración.
 # ============================================================================
 set -euo pipefail
 
-[[ -f "package.json" && -d "src" ]] || { echo "❌  Corré desde la raíz de coworking-back"; exit 1; }
+[[ -f "package.json" && -d "src" ]] || {
+  echo "❌  Corré desde la raíz de coworking-back"
+  exit 1
+}
 
 echo "════════════════════════════════════════════════════════"
-echo "  v32-back-ocupacion-gmail-recepcion  |  coworking-back"
+echo "  v35-back-no-persistir-estado  |  coworking-back"
 echo "════════════════════════════════════════════════════════"
 echo ""
 
-# ── src/ocupacion/dto/create-ocupacion.dto.ts ─────────────────────────────────
-echo "📝  Actualizando create-ocupacion.dto.ts..."
-cat > src/ocupacion/dto/create-ocupacion.dto.ts << 'EOF'
+# ── src/ocupacion/ocupacion.service.ts ───────────────────────────────────────
+echo "📝  Actualizando ocupacion.service.ts..."
+cat > src/ocupacion/ocupacion.service.ts << 'EOF'
 import {
-  IsString,
-  IsOptional,
-  IsInt,
-  IsArray,
-  IsUrl,
-  IsDateString,
-  IsEmail,
-  IsEnum,
-  Matches,
-  Min,
-  Max,
-  MinLength,
-  ArrayMinSize,
-  ArrayMaxSize,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { Recepcion } from '@prisma/client';
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from 'prisma/prisma.service';
+import { CreateOcupacionDto } from './dto/create-ocupacion.dto';
+import { UpdateOcupacionDto } from './dto/update-ocupacion.dto';
 
-export class CreateOcupacionDto {
-  @ApiProperty({ description: 'Título del evento / ocupación' })
-  @IsString()
-  @MinLength(3)
-  titulo: string;
+// ── helpers ──────────────────────────────────────────────────────────────────
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
 
-  @ApiProperty({ description: 'Requerimientos o descripción' })
-  @IsString()
-  @MinLength(3)
-  requerimiento: string;
+function rangosSolapan(
+  aDesde: Date, aHasta: Date, aHoraDesde: string, aHoraHasta: string,
+  bDesde: Date, bHasta: Date, bHoraDesde: string, bHoraHasta: string,
+): boolean {
+  const aD = aDesde.toISOString().split('T')[0];
+  const aH = aHasta.toISOString().split('T')[0];
+  const bD = bDesde.toISOString().split('T')[0];
+  const bH = bHasta.toISOString().split('T')[0];
 
-  @ApiProperty({ description: 'Cantidad estimada de personas' })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  cantidadPersonas: number;
+  if (aD > bH || aH < bD) return false;
 
-  @ApiProperty({ description: 'Nombre del organizador / solicitante' })
-  @IsString()
-  @MinLength(2)
-  organizador: string;
+  const aDesdeMin = timeToMinutes(aHoraDesde);
+  const aHastaMin = timeToMinutes(aHoraHasta);
+  const bDesdeMin = timeToMinutes(bHoraDesde);
+  const bHastaMin = timeToMinutes(bHoraHasta);
 
-  @ApiPropertyOptional({ description: 'Teléfono de contacto del organizador' })
-  @IsOptional()
-  @IsString()
-  telefono?: string;
+  return aDesdeMin < bHastaMin && aHastaMin > bDesdeMin;
+}
 
-  @ApiPropertyOptional({ description: 'Gmail del organizador' })
-  @IsOptional()
-  @IsEmail()
-  gmail?: string;
+// ── service ──────────────────────────────────────────────────────────────────
+@Injectable()
+export class OcupacionService {
+  constructor(private prisma: PrismaService) {}
 
-  @ApiPropertyOptional({
-    enum: Recepcion,
-    description: 'Turno de recepción del evento: MANANA | INTERMEDIO | TARDE',
-  })
-  @IsOptional()
-  @IsEnum(Recepcion)
-  recepcion?: Recepcion;
+  // ── CREATE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
+  async create(dto: CreateOcupacionDto) {
+    const { areaIds, fechaDesde, fechaHasta, horaDesde, horaHasta, telefono, ...rest } = dto;
 
-  @ApiPropertyOptional({ description: 'Nombre de quien recibe al grupo en recepción' })
-  @IsOptional()
-  @IsString()
-  receptor?: string;
+    const fechaDesdeDate = new Date(`${fechaDesde}T00:00:00.000Z`);
+    const fechaHastaDate = new Date(`${fechaHasta}T00:00:00.000Z`);
 
-  @ApiProperty({ example: '2026-08-25', description: 'Fecha de inicio (YYYY-MM-DD)' })
-  @IsDateString()
-  fechaDesde: string;
+    if (fechaDesdeDate > fechaHastaDate) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (timeToMinutes(horaDesde) >= timeToMinutes(horaHasta)) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+    }
 
-  @ApiProperty({ example: '2026-08-25', description: 'Fecha de fin (YYYY-MM-DD)' })
-  @IsDateString()
-  fechaHasta: string;
+    const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+    if (areas.length !== areaIds.length) {
+      const encontrados = areas.map((a) => a.id);
+      const faltantes   = areaIds.filter((id) => !encontrados.includes(id));
+      throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
+    }
 
-  @ApiProperty({ example: '09:00', description: 'Hora de inicio (HH:mm)' })
-  @IsString()
-  @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaDesde debe ser HH:mm' })
-  horaDesde: string;
+    await this._validarConflictos(areaIds, fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta);
 
-  @ApiProperty({ example: '12:00', description: 'Hora de fin (HH:mm)' })
-  @IsString()
-  @Matches(/^([0-1]?\d|2[0-3]):[0-5]\d$/, { message: 'horaHasta debe ser HH:mm' })
-  horaHasta: string;
+    // Solo crea la ocupación — NO modifica area.estado
+    return this.prisma.ocupacion.create({
+      data: {
+        ...rest,
+        telefono: telefono ?? undefined,
+        fechaDesde: fechaDesdeDate,
+        fechaHasta: fechaHastaDate,
+        horaDesde,
+        horaHasta,
+        areas: { create: areaIds.map((areaId) => ({ areaId })) },
+      },
+      include: { areas: { include: { area: true } } },
+    });
+  }
 
-  @ApiPropertyOptional({ description: 'Edad mínima del público' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(120)
-  edadMin?: number;
+  // ── FIND ALL ───────────────────────────────────────────────────────────────
+  findAll() {
+    return this.prisma.ocupacion.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { areas: { include: { area: true } } },
+    });
+  }
 
-  @ApiPropertyOptional({ description: 'Edad máxima del público' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(120)
-  edadMax?: number;
+  // ── FIND ACTIVAS ───────────────────────────────────────────────────────────
+  findActivas() {
+    const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
+    return this.prisma.ocupacion.findMany({
+      where: { liberadaAt: null, fechaHasta: { gte: hoy } },
+      orderBy: { fechaDesde: 'asc' },
+      include: { areas: { include: { area: true } } },
+    });
+  }
 
-  @ApiPropertyOptional({ description: 'URLs de anexos / documentos', type: [String] })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10)
-  @IsUrl({}, { each: true })
-  anexos?: string[];
+  // ── FIND ONE ───────────────────────────────────────────────────────────────
+  async findOne(id: number) {
+    const oc = await this.prisma.ocupacion.findUnique({
+      where: { id },
+      include: { areas: { include: { area: true } } },
+    });
+    if (!oc) throw new NotFoundException('Ocupación no encontrada');
+    return oc;
+  }
 
-  @ApiProperty({ description: 'IDs de las áreas a ocupar', type: [Number] })
-  @IsArray()
-  @ArrayMinSize(1)
-  @Type(() => Number)
-  @IsInt({ each: true })
-  areaIds: number[];
+  // ── UPDATE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
+  async update(id: number, dto: UpdateOcupacionDto) {
+    const oc = await this.findOne(id);
+
+    const {
+      areaIds, fechaDesde, fechaHasta,
+      horaDesde, horaHasta, telefono, ...rest
+    } = dto;
+
+    const fechaDesdeDate = fechaDesde
+      ? new Date(`${fechaDesde}T00:00:00.000Z`)
+      : oc.fechaDesde;
+    const fechaHastaDate = fechaHasta
+      ? new Date(`${fechaHasta}T00:00:00.000Z`)
+      : oc.fechaHasta;
+
+    const horaDesdeEfectiva = horaDesde ?? oc.horaDesde;
+    const horaHastaEfectiva = horaHasta ?? oc.horaHasta;
+
+    if (fechaDesdeDate > fechaHastaDate) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+    if (timeToMinutes(horaDesdeEfectiva) >= timeToMinutes(horaHastaEfectiva)) {
+      throw new BadRequestException('horaDesde debe ser anterior a horaHasta');
+    }
+
+    const areaIdsEfectivos = areaIds ?? oc.areas.map((r) => r.areaId);
+
+    const cambiaHorario =
+      areaIds !== undefined ||
+      fechaDesde !== undefined ||
+      fechaHasta !== undefined ||
+      horaDesde !== undefined ||
+      horaHasta !== undefined;
+
+    if (cambiaHorario) {
+      if (areaIds !== undefined) {
+        const areas = await this.prisma.area.findMany({ where: { id: { in: areaIds } } });
+        if (areas.length !== areaIds.length) {
+          const faltantes = areaIds.filter((aid) => !areas.find((a) => a.id === aid));
+          throw new NotFoundException(`Área(s) no encontrada(s): ${faltantes.join(', ')}`);
+        }
+      }
+
+      await this._validarConflictos(
+        areaIdsEfectivos,
+        fechaDesdeDate,
+        fechaHastaDate,
+        horaDesdeEfectiva,
+        horaHastaEfectiva,
+        id,
+      );
+    }
+
+    // Solo actualiza la ocupación — NO modifica area.estado
+    return this.prisma.ocupacion.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(telefono !== undefined && { telefono: telefono || null }),
+        fechaDesde: fechaDesdeDate,
+        fechaHasta: fechaHastaDate,
+        horaDesde:  horaDesdeEfectiva,
+        horaHasta:  horaHastaEfectiva,
+        ...(areaIds !== undefined && {
+          areas: {
+            deleteMany: {},
+            create: areaIds.map((areaId) => ({ areaId })),
+          },
+        }),
+      },
+      include: { areas: { include: { area: true } } },
+    });
+  }
+
+  // ── LIBERAR ────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
+  async liberar(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.ocupacion.update({
+      where: { id },
+      data:  { liberadaAt: new Date() },
+      include: { areas: { include: { area: true } } },
+    });
+  }
+
+  // ── REMOVE ─────────────────────────────────────────────────────────────────
+  // NO toca area.estado — el estado se calcula en tiempo real
+  async remove(id: number) {
+    await this.findOne(id);
+
+    await this.prisma.ocupacionArea.deleteMany({ where: { ocupacionId: id } });
+    return this.prisma.ocupacion.delete({ where: { id } });
+  }
+
+  // ── helper: valida conflictos de horario ───────────────────────────────────
+  private async _validarConflictos(
+    areaIds: number[],
+    fechaDesdeDate: Date,
+    fechaHastaDate: Date,
+    horaDesde: string,
+    horaHasta: string,
+    excluirId?: number,
+  ) {
+    const existentes = await this.prisma.ocupacion.findMany({
+      where: {
+        liberadaAt: null,
+        areas: { some: { areaId: { in: areaIds } } },
+        ...(excluirId !== undefined && { id: { not: excluirId } }),
+      },
+      include: { areas: true },
+    });
+
+    const conflictivas = existentes.filter((oc) =>
+      rangosSolapan(
+        fechaDesdeDate, fechaHastaDate, horaDesde, horaHasta,
+        oc.fechaDesde,  oc.fechaHasta,  oc.horaDesde, oc.horaHasta,
+      ),
+    );
+
+    if (conflictivas.length > 0) {
+      const areasConflicto = [
+        ...new Set(
+          conflictivas.flatMap((oc) =>
+            oc.areas
+              .filter((r) => areaIds.includes(r.areaId))
+              .map((r) => r.areaId),
+          ),
+        ),
+      ];
+      throw new BadRequestException(
+        `Conflicto de horario: las áreas [${areasConflicto.join(', ')}] ya están reservadas para la ocupación "${conflictivas[0].titulo}"`,
+      );
+    }
+  }
 }
 EOF
-echo "  ✅  create-ocupacion.dto.ts listo"
-
-# ── src/ocupacion/dto/update-ocupacion.dto.ts ────────────────────────────────
-echo "📝  Actualizando update-ocupacion.dto.ts..."
-cat > src/ocupacion/dto/update-ocupacion.dto.ts << 'EOF'
-import { PartialType } from '@nestjs/swagger';
-import { CreateOcupacionDto } from './create-ocupacion.dto';
-export class UpdateOcupacionDto extends PartialType(CreateOcupacionDto) {}
-EOF
-echo "  ✅  update-ocupacion.dto.ts listo"
-
-# ── src/ocupacion/ocupacion.service.ts — propagar nuevos campos ───────────────
-# El service no necesita cambios: usa spread (...rest) para todos los campos
-# del DTO y Prisma los persiste automáticamente.
-# Solo verificamos que el build compila correctamente.
+echo "  ✅  ocupacion.service.ts — sin updateMany de area.estado"
 
 echo ""
 echo "🔨  Build de verificación..."
 pnpm build
 
 echo ""
-echo "✅  v32-back-ocupacion-gmail-recepcion completado"
+echo "✅  v35-back-no-persistir-estado completado"
+echo ""
+echo "  Cambios:"
+echo "   • create()  — ya NO hace updateMany OCUPADO"
+echo "   • update()  — ya NO hace updateMany LIBRE/OCUPADO"
+echo "   • liberar() — ya NO hace updateMany LIBRE"
+echo "   • remove()  — ya NO hace updateMany LIBRE"
+echo ""
+echo "  El estado de las áreas ahora se calcula 100% en tiempo real"
+echo "  desde GET /areas/estado-actual usando fechaDesde/Hasta + horaDesde/Hasta"
