@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateAreaDto } from './dto/create-area.dto';
 import { UpdateAreaDto } from './dto/update-area.dto';
 import { PrismaService } from 'prisma/prisma.service';
-import { AreaStatus } from '@prisma/client';
+import { AreaStatus, CodigoArea, Prisma } from '@prisma/client';
+import { BloquearAreasDto } from './dto/bloquear-areas.dto';
+import { ZONA_POR_CODIGO } from './area.constants';
 
 /**
  * Helpers de zona horaria Argentina (UTC-3).
@@ -24,7 +26,15 @@ export class AreaService {
   constructor(private prisma: PrismaService) {}
 
   create(data: CreateAreaDto) {
-    return this.prisma.area.create({ data });
+    return this.prisma.area.create({ data: this.completarZona(data) });
+  }
+
+  /** Si viene `codigo` sin `zona`, la deduce. */
+  private completarZona<T extends { codigo?: CodigoArea; zona?: unknown }>(data: T): T {
+    if (data.codigo && !data.zona) {
+      return { ...data, zona: ZONA_POR_CODIGO[data.codigo] };
+    }
+    return data;
   }
 
   findAll() {
@@ -36,7 +46,7 @@ export class AreaService {
   }
 
   update(id: number, data: UpdateAreaDto) {
-    return this.prisma.area.update({ where: { id }, data });
+    return this.prisma.area.update({ where: { id }, data: this.completarZona(data) });
   }
 
   async remove(id: number) {
@@ -63,6 +73,43 @@ export class AreaService {
       });
     }
     return this.prisma.area.findMany();
+  }
+
+  /**
+   * Bloquea/libera solo las áreas indicadas por código y/o zona.
+   * Al liberar, respeta las áreas con una reserva de asiento activa.
+   */
+  async bloquearSeleccion(dto: BloquearAreasDto) {
+    const { estado, codigos = [], zonas = [] } = dto;
+    if (codigos.length === 0 && zonas.length === 0) {
+      throw new BadRequestException('Indicá al menos un código o una zona');
+    }
+
+    const seleccion: Prisma.AreaWhereInput = {
+      OR: [
+        ...(codigos.length ? [{ codigo: { in: codigos } }] : []),
+        ...(zonas.length ? [{ zona: { in: zonas } }] : []),
+      ],
+    };
+
+    if (estado === AreaStatus.OCUPADO) {
+      await this.prisma.area.updateMany({
+        where: seleccion,
+        data: { estado: AreaStatus.OCUPADO },
+      });
+    } else {
+      const reservasActivas = await this.prisma.reserva.findMany({
+        where: { fin: null },
+        select: { areaId: true },
+      });
+      await this.prisma.area.updateMany({
+        where: {
+          AND: [seleccion, { id: { notIn: reservasActivas.map((r) => r.areaId) } }],
+        },
+        data: { estado: AreaStatus.LIBRE },
+      });
+    }
+    return this.prisma.area.findMany({ where: seleccion });
   }
 
   /**

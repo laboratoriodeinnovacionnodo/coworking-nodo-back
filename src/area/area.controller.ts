@@ -4,6 +4,7 @@ import { CreateAreaDto } from './dto/create-area.dto';
 import { UpdateAreaDto } from './dto/update-area.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AreaStatus } from '@prisma/client';
+import { BloquearAreasDto } from './dto/bloquear-areas.dto';
 
 @ApiTags('areas')
 @Controller('areas')
@@ -36,6 +37,13 @@ export class AreaController {
   @Patch('bloquear-todas/:estado')
   bloquearTodas(@Param('estado') estado: AreaStatus) {
     return this.areaService.bloquearTodas(estado);
+  }
+
+  // Selectivo: PATCH /areas/bloquear  { estado, codigos?: ['A1'], zonas?: ['SILLONES_ROJOS'] }
+  @Patch('bloquear')
+  @ApiOperation({ summary: 'Bloquea/libera áreas por código y/o zona' })
+  bloquear(@Body() dto: BloquearAreasDto) {
+    return this.areaService.bloquearSeleccion(dto);
   }
 
   @Get(':id')

@@ -22,6 +22,24 @@ enum AreaStatus {
   OCUPADO
 }
 
+enum CodigoArea {
+  A1
+  A2
+  B1
+  B2
+  B3
+  B4
+  C1
+  C2
+  C3
+}
+
+enum ZonaArea {
+  SILLONES_NARANJAS
+  SILLONES_ROJOS
+  SEMICIRCULOS_NEGROS
+}
+
 enum Recepcion {
   MANANA
   INTERMEDIO
@@ -53,6 +71,8 @@ model Area {
   nombre      String
   descripcion String?
   estado      AreaStatus  @default(LIBRE)  // ← ENUM actualizado
+  codigo      CodigoArea? @unique
+  zona        ZonaArea?
   reservas    Reserva[]
   createdAt   DateTime    @default(now())
   areas  OcupacionArea[]

@@ -1,4 +1,4 @@
-import { AreaStatus } from '@prisma/client';
+import { AreaStatus, CodigoArea, ZonaArea } from '@prisma/client';
 import { IsOptional, IsString, IsEnum } from 'class-validator';
 
 export class CreateAreaDto {
@@ -12,4 +12,12 @@ export class CreateAreaDto {
   @IsOptional()
   @IsEnum(AreaStatus)
   estado?: AreaStatus;
+
+  @IsOptional()
+  @IsEnum(CodigoArea)
+  codigo?: CodigoArea;
+
+  @IsOptional()
+  @IsEnum(ZonaArea)
+  zona?: ZonaArea;
 }
